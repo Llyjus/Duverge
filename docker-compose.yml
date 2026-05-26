@@ -1,0 +1,45 @@
+services:
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    ports:
+      - "26526:26526" 
+    depends_on:
+      - game
+      - room
+      - userData
+    networks:
+      - game-net
+
+  game:
+    build: ./game
+    container_name: game
+    networks:
+      - game-net
+
+  room:
+    build: ./room
+    container_name: room
+    networks:
+      - game-net
+
+  userData:
+    build: ./userData   
+    container_name: userData
+    networks:
+      - game-net
+
+  test:
+    build: ./test
+    container_name: test
+    depends_on:
+      - game
+      - room
+      - userData
+      - gateway
+    networks:
+      - game-net
+
+networks:
+  game-net:
+    driver: bridge
