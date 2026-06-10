@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"gateway/internal/handler"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,7 +19,7 @@ func main() {
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
 		Addr:    "127.0.0.1:26526",
-		Handler: http.HandlerFunc(handleLogin),
+		Handler: http.HandlerFunc(handler.HandleLogin),
 	}
 
 	go func() {
@@ -28,12 +30,26 @@ func main() {
 		}
 	}()
 
+	// TCP server
+	tcpListener, err := net.Listen("tcp", ":26527")
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		fmt.Println("[TCP] game server is running on: :26527")
+		for {
+			conn, err := tcpListener.Accept()
+			if err != nil {
+				fmt.Printf("[TCP] error accepting connection: %v\n", err)
+				return
+			}
+
+			// for every new connection, handle it in a separate goroutine
+			go handler.HandleGameTCP(conn)
+		}
+	}()
+
 	<-quit
 	fmt.Println("Shutting down server...")
-}
-
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Received login request")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Login successful"))
 }
