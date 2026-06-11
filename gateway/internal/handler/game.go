@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-func HandleGameTCP(conn net.Conn) {
+func HandleGame(conn net.Conn) {
 	// close the connection when the function returns
 	defer conn.Close()
 	fmt.Printf("[TCP] player connected: %s\n", conn.RemoteAddr().String())
