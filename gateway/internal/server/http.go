@@ -14,7 +14,7 @@ func HttpServer() {
 	}
 
 	go func() {
-		fmt.Println("another thread is running...")
+		fmt.Println("[HTTP] new thread is running...")
 
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("[HTTP] error: %v\n", err)

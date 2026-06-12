@@ -13,7 +13,7 @@ func TcpServer() {
 		panic(err)
 	}
 
-	fmt.Println("[TCP] game server is running")
+	fmt.Println("[TCP] game server is running...")
 
 	go func() {
 		for {
