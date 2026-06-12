@@ -7,7 +7,10 @@ import (
 
 func HandleGame(conn net.Conn) {
 	// close the connection when the function returns
-	defer conn.Close()
+	defer func() {
+		fmt.Printf("[TCP] player disconnected: %s\n", conn.RemoteAddr().String())
+		conn.Close()
+	}()
 	fmt.Printf("[TCP] player connected: %s\n", conn.RemoteAddr().String())
 
 	buf := make([]byte, 1024)
