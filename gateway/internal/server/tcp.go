@@ -13,8 +13,9 @@ func TcpServer() {
 		panic(err)
 	}
 
+	fmt.Println("[TCP] game server is running")
+
 	go func() {
-		fmt.Println("[TCP] game server is running on: :26527")
 		for {
 			conn, err := tcpListener.Accept()
 			if err != nil {
