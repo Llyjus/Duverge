@@ -1,16 +1,17 @@
 package router
 
 import (
-	"gateway/internal/handler"
+	"gateway/internal/service/html/health"
+	"gateway/internal/service/html/login"
 	"net/http"
 )
 
 func NewHTTPRouter() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/login", handler.HandleLogin)
+	mux.HandleFunc("/login", login.HandleLogin)
 
-	mux.HandleFunc("/health", handler.HandleHealth)
+	mux.HandleFunc("/health", health.HandleHealth)
 
 	return mux
 }

@@ -1,8 +1,7 @@
-package handler
+package login
 
 import (
 	"fmt"
-	"gateway/internal/service"
 	"net/http"
 )
 
@@ -10,7 +9,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Received login request")
 
-	res := service.Login()
+	res := login()
 	w.Write([]byte(res))
 
 }

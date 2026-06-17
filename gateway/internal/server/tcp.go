@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"gateway/internal/handler"
+	"gateway/internal/service/tcp/game"
 	"net"
 )
 
@@ -23,7 +23,7 @@ func TcpServer() {
 				return
 			}
 			// for every new connection, handle it in a separate goroutine
-			go handler.HandleGame(conn)
+			go game.HandleGame(conn)
 		}
 	}()
 }
