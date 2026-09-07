@@ -81,6 +81,6 @@
       "file:///Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/protobuf-maven-plugin/generate/generate/archives/protobuf-java-3.25.9-935a3df64b7644bce8166e8078d5d56ce5cf3d89/google/protobuf/timestamp.proto": "65b9fc9bdb45fb6d9363d5c6a4e620fac495cdf7585efe2afc1e84075b491e8079a90c4bb626e0f25624590ec21806ab2ed2e5304cb53a62597786ba7004d381",
       "file:///Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/protobuf-maven-plugin/generate/generate/archives/proto-google-common-protos-2.64.1-0eed12cf078f42a667ec728066670239d59210a3/google/api/service.proto": "3b76eb7542c19775adba0205b84fa897a4685a7e67a191880358e761af5d44b750181a90a347d78a4e7cb773ff51983401d461f4efa987b7b502d27f7754d341"
     },
-    "proto_sources": {"file:///Users/Admin/Documents/project/Duverge/Duverge/proto/user_info/login.proto": "314d38debabbc9f1e81fa14b1cd2b18b415d4b0575987b4fc1b29cf89a2c19f50c0e771a9377e59cad39963bf8ac084fb502c66ae529f13dba9ad75fcd18018f"},
+    "proto_sources": {"file:///Users/Admin/Documents/project/Duverge/Duverge/proto/user_info/login.proto": "16259eca99fd8ec1284ef62de611ee5baad42d0361ae1e2ba7f663200cafd530bb46712b75b8930a530b38c52248f9c1f1e465cad65588c0122f2a3822b036b4"},
     "descriptor_files": {}
   }
