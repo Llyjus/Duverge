@@ -1,9 +1,0 @@
---java_out=/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/generated-sources/protobuf
---plugin=protoc-gen-0_640382a440d63ac5271aed564a01c0106626e4cc=/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/protobuf-maven-plugin/generate/generate/artifacts/protoc-gen-grpc-java-a6a3b472e2294db9c4d260b6f171d7d0d2ed6311.exe
---0_640382a440d63ac5271aed564a01c0106626e4cc_out=/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/generated-sources/protobuf
---0_640382a440d63ac5271aed564a01c0106626e4cc_opt=@generated=omit
-/Users/Admin/Documents/project/Duverge/Duverge/proto/user_info/login.proto
---proto_path=/Users/Admin/Documents/project/Duverge/Duverge/proto
---proto_path=/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/protobuf-maven-plugin/generate/generate/archives/grpc-services-1.83.1-e2edb509b4e6393291ef4ec43914afe71e366f50
---proto_path=/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/protobuf-maven-plugin/generate/generate/archives/protobuf-java-3.25.9-935a3df64b7644bce8166e8078d5d56ce5cf3d89
---proto_path=/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/protobuf-maven-plugin/generate/generate/archives/proto-google-common-protos-2.64.1-0eed12cf078f42a667ec728066670239d59210a3
