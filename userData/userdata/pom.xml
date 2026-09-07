@@ -70,6 +70,15 @@
 			<plugin>
 				<groupId>io.github.ascopes</groupId>
 				<artifactId>protobuf-maven-plugin</artifactId>
+
+				<configuration> 
+					<sourceDirectories>
+						<sourceDirectory>
+							${project.basedir}/../../proto
+						</sourceDirectory>
+					</sourceDirectories>
+				</configuration>
+
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
