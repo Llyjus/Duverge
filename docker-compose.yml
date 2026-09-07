@@ -40,6 +40,19 @@ services:
     networks:
       - game-net
 
+  mysql:
+    image: mysql:8.4
+    container_name: user-data-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: user_data
+      MYSQL_USER: rin
+      MYSQL_PASSWORD: llyjus
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
 networks:
   game-net:
     driver: bridge
