@@ -1,4 +1,4 @@
-package com.Duverge.userdata;
+package com.duverge.userdata;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
