@@ -11,3 +11,7 @@ spring:
     hibernate:
       ddl-auto: none
     show-sql: true
+
+  grpc:
+    server:
+      port: 9090
