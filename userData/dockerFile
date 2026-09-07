@@ -2,15 +2,14 @@ FROM maven:3.9-eclipse-temurin-21
 
 WORKDIR /app
 
-COPY pom.xml .
+COPY userdata/pom.xml .
 
 RUN mvn dependency:go-offline
 
-COPY src src
+COPY userdata/src src
 
-RUN mvn package \
--DskipTests
+RUN mvn package -DskipTests
 
-EXPOSE 9300
+EXPOSE 8080
 
-CMD ["java", "-jar", "target/userData.jar"]
+CMD ["java", "-jar", "target/userdata.jar"]
