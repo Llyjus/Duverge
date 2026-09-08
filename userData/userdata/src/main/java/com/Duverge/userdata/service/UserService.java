@@ -14,11 +14,11 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public boolean setNewUser(String username, String password) {
+    public boolean setNewUser(String accountId, String password) {
 
         User user = new User();
 
-        user.setAccountId(username);
+        user.setAccountId(accountId);
         user.setPassword(password);
 
         userRepository.save(user);
@@ -27,25 +27,29 @@ public class UserService {
         return true;
     }
 
-    public boolean setUser(String username) {
-        User user = userRepository.findByAccountId(username);
+    public boolean setUser(String accountId) {
+        User user = userRepository.findByAccountId(accountId);
         if (user == null) {
             return false;
         }
-        user.setAccountId(username);
+        user.setAccountId(accountId);
         // deal with false of connection
         return true;
     }
 
-    public boolean checkUser(String username, String password) {
-        User user = userRepository.findByAccountId(username);
+    public boolean checkUser(String accountId, String password) {
+        User user = userRepository.findByAccountId(accountId);
         if (user == null) {
             return false;
         }
         return user.getPassword().equals(password);
     }
 
-    public User getUser(Long id) {
+    public User getUser(String accountId) {
+        return userRepository.findByAccountId(accountId);
+    }
+
+    public User getUserById(Long id) {
         return userRepository.findById(id).orElse(null);
     }
 }

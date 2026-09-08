@@ -12,7 +12,7 @@ service UserDataService {
 }
 
 message UserRegistrationRequest {
-  int32 accountid = 1;
+  string account_id = 1;
   string password = 2;
 }
 
@@ -21,7 +21,7 @@ message UserRegistrationResponse {
 }
 
 message UserLoginRequest {
-  int32 accountid = 1;
+  string account_id = 1;
   string password = 2;
 }
 
