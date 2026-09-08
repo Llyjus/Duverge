@@ -54,7 +54,7 @@ services:
       - "3306:3306"
     networks:
       - game-net
-
+      
 networks:
   game-net:
     driver: bridge

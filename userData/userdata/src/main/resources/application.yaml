@@ -2,7 +2,11 @@ spring:
   application:
     name: userdata
 
-
+  datasource:
+    url: jdbc:mysql://mysql:3306/user_data
+    username: rin
+    password: llyjus
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
