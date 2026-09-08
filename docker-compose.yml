@@ -7,7 +7,7 @@ services:
     depends_on:
       - game
       - room
-      - userData
+      - userdata
     networks:
       - game-net
 
@@ -23,9 +23,9 @@ services:
     networks:
       - game-net
 
-  userData:
+  userdata:
     build: ./userData   
-    container_name: userData
+    container_name: userdata
     networks:
       - game-net
 
@@ -35,7 +35,7 @@ services:
     depends_on:
       - game
       - room
-      - userData
+      - userdata
       - gateway
     networks:
       - game-net
