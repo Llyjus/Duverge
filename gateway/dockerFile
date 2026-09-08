@@ -13,6 +13,7 @@ RUN go build \
 -o gateway \
 ./cmd/main.go
 
-EXPOSE 38080
+EXPOSE 26526
+EXPOSE 26527
 
 CMD ["./gateway"]
