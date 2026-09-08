@@ -2,15 +2,17 @@ syntax = "proto3";
 
 package user_info;
 
-option go_package = "gateway/proto/userInfo/gen";
+option go_package = "gateway/proto/userdata/gen";
+option java_multiple_files = true;
+option java_package = "com.example.userdata.grpc";
 
-service UsersLoginService {
+service UserDataService {
   rpc UserRegistration(UserRegistrationRequest) returns (UserRegistrationResponse) {}
   rpc UserLogin(UserLoginRequest) returns (UserLoginResponse) {}
 }
 
 message UserRegistrationRequest {
-  int32 userid = 1;
+  string account_id = 1;
   string password = 2;
 }
 
@@ -19,7 +21,7 @@ message UserRegistrationResponse {
 }
 
 message UserLoginRequest {
-  int32 userid = 1;
+  string account_id = 1;
   string password = 2;
 }
 
