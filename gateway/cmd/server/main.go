@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gateway/internal/client/userdata"
 	"gateway/internal/server"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
+	userdata.NewClient("userdata:9090")
 	// Start the HTTP server
 	server.HttpServer()
 
