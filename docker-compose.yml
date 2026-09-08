@@ -52,7 +52,9 @@ services:
       - ./mysql/data:/var/lib/mysql
     ports:
       - "3306:3306"
-
+    networks:
+      - game-net
+      
 networks:
   game-net:
     driver: bridge
