@@ -33,6 +33,7 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         responseObserver.onCompleted();
     }
 
+    @Override
     public void userRegistration(
             com.example.userdata.grpc.UserRegistrationRequest request,
             StreamObserver<com.example.userdata.grpc.UserRegistrationResponse> responseObserver) {
