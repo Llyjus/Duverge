@@ -3,9 +3,10 @@ spring:
     name: userdata
 
   datasource:
-    url: jdbc:mysql://localhost:3306/userdata
-    username: root
-    password:
+    url: jdbc:mysql://mysql:3306/user_data
+    username: rin
+    password: llyjus
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
