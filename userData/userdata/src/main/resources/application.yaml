@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: userdata
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/userdata
+    username: root
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  grpc:
+    server:
+      port: 9090
