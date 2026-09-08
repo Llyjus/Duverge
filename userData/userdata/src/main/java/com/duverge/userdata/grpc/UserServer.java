@@ -32,4 +32,18 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+    public void userRegistration(
+            com.example.userdata.grpc.UserRegistrationRequest request,
+            StreamObserver<com.example.userdata.grpc.UserRegistrationResponse> responseObserver) {
+
+        boolean userSetResult = userService.setNewUser(request.getAccountId(), request.getPassword());
+
+        com.example.userdata.grpc.UserRegistrationResponse response = com.example.userdata.grpc.UserRegistrationResponse.newBuilder()
+                .setResult(userSetResult)
+                .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }
