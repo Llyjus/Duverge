@@ -18,6 +18,11 @@ public class UserService {
 
         User user = new User();
 
+        User userCheck = userRepository.findByAccountId(accountId);
+        if (userCheck != null) {
+            return false;
+        }
+
         user.setAccountId(accountId);
         user.setPassword(password);
 
