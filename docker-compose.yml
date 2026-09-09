@@ -24,13 +24,21 @@ services:
   #     - game-net
 
   userdata:
-    build: ./userData   
+    build:
+      context: ./userData
+      dockerfile: Dockerfile
     container_name: userdata
+    environment:
+        MYSQL_DATABASE: ${MYSQL_DATABASE}
+        MYSQL_USER: ${MYSQL_USER}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_started
     networks:
       - game-net
-    depends_on:
-      - mysql
-      - redis
 
   # test:
   #   build: ./test
