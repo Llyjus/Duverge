@@ -15,4 +15,16 @@ public interface UserLoginResponseOrBuilder extends
    * @return The result.
    */
   boolean getResult();
+
+  /**
+   * <code>string account_id = 2;</code>
+   * @return The accountId.
+   */
+  java.lang.String getAccountId();
+  /**
+   * <code>string account_id = 2;</code>
+   * @return The bytes for accountId.
+   */
+  com.google.protobuf.ByteString
+      getAccountIdBytes();
 }

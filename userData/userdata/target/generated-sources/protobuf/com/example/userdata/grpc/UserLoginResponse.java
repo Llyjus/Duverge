@@ -28,6 +28,7 @@ private static final long serialVersionUID = 0L;
     super(builder);
   }
   private UserLoginResponse() {
+    accountId_ = "";
   }
 
   public static final com.google.protobuf.Descriptors.Descriptor
@@ -59,6 +60,45 @@ private static final long serialVersionUID = 0L;
     return result_;
   }
 
+  public static final int ACCOUNT_ID_FIELD_NUMBER = 2;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object accountId_ = "";
+  /**
+   * <code>string account_id = 2;</code>
+   * @return The accountId.
+   */
+  @java.lang.Override
+  public java.lang.String getAccountId() {
+    java.lang.Object ref = accountId_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      accountId_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string account_id = 2;</code>
+   * @return The bytes for accountId.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getAccountIdBytes() {
+    java.lang.Object ref = accountId_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      accountId_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
   private byte memoizedIsInitialized = -1;
   @java.lang.Override
   public final boolean isInitialized() {
@@ -76,6 +116,9 @@ private static final long serialVersionUID = 0L;
     if (result_ != false) {
       output.writeBool(1, result_);
     }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(accountId_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 2, accountId_);
+    }
     getUnknownFields().writeTo(output);
   }
   private int computeSerializedSize_0() {
@@ -83,6 +126,9 @@ private static final long serialVersionUID = 0L;
     if (result_ != false) {
       size += com.google.protobuf.CodedOutputStream
         .computeBoolSize(1, result_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(accountId_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(2, accountId_);
     }
     return size;
   }
@@ -110,6 +156,8 @@ private static final long serialVersionUID = 0L;
 
     if (getResult()
         != other.getResult()) return false;
+    if (!getAccountId()
+        .equals(other.getAccountId())) return false;
     if (!getUnknownFields().equals(other.getUnknownFields())) return false;
     return true;
   }
@@ -124,6 +172,8 @@ private static final long serialVersionUID = 0L;
     hash = (37 * hash) + RESULT_FIELD_NUMBER;
     hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
         getResult());
+    hash = (37 * hash) + ACCOUNT_ID_FIELD_NUMBER;
+    hash = (53 * hash) + getAccountId().hashCode();
     hash = (29 * hash) + getUnknownFields().hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -256,6 +306,7 @@ private static final long serialVersionUID = 0L;
       super.clear();
       bitField0_ = 0;
       result_ = false;
+      accountId_ = "";
       return this;
     }
 
@@ -292,6 +343,9 @@ private static final long serialVersionUID = 0L;
       if (((from_bitField0_ & 0x00000001) != 0)) {
         result.result_ = result_;
       }
+      if (((from_bitField0_ & 0x00000002) != 0)) {
+        result.accountId_ = accountId_;
+      }
     }
 
     @java.lang.Override
@@ -308,6 +362,11 @@ private static final long serialVersionUID = 0L;
       if (other == com.example.userdata.grpc.UserLoginResponse.getDefaultInstance()) return this;
       if (other.getResult() != false) {
         setResult(other.getResult());
+      }
+      if (!other.getAccountId().isEmpty()) {
+        accountId_ = other.accountId_;
+        bitField0_ |= 0x00000002;
+        onChanged();
       }
       this.mergeUnknownFields(other.getUnknownFields());
       onChanged();
@@ -340,6 +399,11 @@ private static final long serialVersionUID = 0L;
               bitField0_ |= 0x00000001;
               break;
             } // case 8
+            case 18: {
+              accountId_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000002;
+              break;
+            } // case 18
             default: {
               if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                 done = true; // was an endgroup tag
@@ -385,6 +449,78 @@ private static final long serialVersionUID = 0L;
     public Builder clearResult() {
       bitField0_ = (bitField0_ & ~0x00000001);
       result_ = false;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object accountId_ = "";
+    /**
+     * <code>string account_id = 2;</code>
+     * @return The accountId.
+     */
+    public java.lang.String getAccountId() {
+      java.lang.Object ref = accountId_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        accountId_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string account_id = 2;</code>
+     * @return The bytes for accountId.
+     */
+    public com.google.protobuf.ByteString
+        getAccountIdBytes() {
+      java.lang.Object ref = accountId_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        accountId_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string account_id = 2;</code>
+     * @param value The accountId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setAccountId(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      accountId_ = value;
+      bitField0_ |= 0x00000002;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string account_id = 2;</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearAccountId() {
+      accountId_ = getDefaultInstance().getAccountId();
+      bitField0_ = (bitField0_ & ~0x00000002);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string account_id = 2;</code>
+     * @param value The bytes for accountId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setAccountIdBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      accountId_ = value;
+      bitField0_ |= 0x00000002;
       onChanged();
       return this;
     }

@@ -33,4 +33,16 @@ public interface UserLoginRequestOrBuilder extends
    */
   com.google.protobuf.ByteString
       getPasswordBytes();
+
+  /**
+   * <code>string session_id = 3;</code>
+   * @return The sessionId.
+   */
+  java.lang.String getSessionId();
+  /**
+   * <code>string session_id = 3;</code>
+   * @return The bytes for sessionId.
+   */
+  com.google.protobuf.ByteString
+      getSessionIdBytes();
 }

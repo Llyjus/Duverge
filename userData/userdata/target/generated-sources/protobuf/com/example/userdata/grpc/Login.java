@@ -58,9 +58,10 @@ public final class Login extends com.google.protobuf.GeneratedFile {
       "\n\013login.proto\022\tuser_info\"?\n\027UserRegistra" +
       "tionRequest\022\022\n\naccount_id\030\001 \001(\t\022\020\n\010passw" +
       "ord\030\002 \001(\t\"*\n\030UserRegistrationResponse\022\016\n" +
-      "\006result\030\001 \001(\010\"8\n\020UserLoginRequest\022\022\n\nacc" +
-      "ount_id\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\"#\n\021UserL" +
-      "oginResponse\022\016\n\006result\030\001 \001(\0102\272\001\n\017UserDat" +
+      "\006result\030\001 \001(\010\"L\n\020UserLoginRequest\022\022\n\nacc" +
+      "ount_id\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\022\022\n\nsessi" +
+      "on_id\030\003 \001(\t\"7\n\021UserLoginResponse\022\016\n\006resu" +
+      "lt\030\001 \001(\010\022\022\n\naccount_id\030\002 \001(\t2\272\001\n\017UserDat" +
       "aService\022]\n\020UserRegistration\022\".user_info" +
       ".UserRegistrationRequest\032#.user_info.Use" +
       "rRegistrationResponse\"\000\022H\n\tUserLogin\022\033.u" +
@@ -90,13 +91,13 @@ public final class Login extends com.google.protobuf.GeneratedFile {
     internal_static_user_info_UserLoginRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_user_info_UserLoginRequest_descriptor,
-        new java.lang.String[] { "AccountId", "Password", });
+        new java.lang.String[] { "AccountId", "Password", "SessionId", });
     internal_static_user_info_UserLoginResponse_descriptor =
       getDescriptor().getMessageType(3);
     internal_static_user_info_UserLoginResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_user_info_UserLoginResponse_descriptor,
-        new java.lang.String[] { "Result", });
+        new java.lang.String[] { "Result", "AccountId", });
     descriptor.resolveAllFeaturesImmutable();
   }
 

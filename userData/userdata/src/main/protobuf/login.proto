@@ -23,8 +23,10 @@ message UserRegistrationResponse {
 message UserLoginRequest {
   string account_id = 1;
   string password = 2;
+  string session_id = 3;
 }
 
 message UserLoginResponse {
   bool result = 1;
+  string account_id = 2;
 }
