@@ -44,10 +44,10 @@ services:
     image: mysql:8.4
     container_name: user-data-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: user_data
-      MYSQL_USER: rin
-      MYSQL_PASSWORD: llyjus
+      MYSQL_ROOT_PASSWORD: ${ MYSQL_ROOT_PASSWORD }
+      MYSQL_DATABASE: ${ MYSQL_DATABASE }
+      MYSQL_USER: ${ MYSQL_USER }
+      MYSQL_PASSWORD: ${ MYSQL_PASSWORD }
     volumes:
       - ./mysql/data:/var/lib/mysql
     ports:
