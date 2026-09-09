@@ -3,6 +3,8 @@
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/grpc/UserServer.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/repository/UserRepository.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/service/UserService.java
+/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/test/GrpcTester.java
+/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/test/WriteInTester.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/generated-sources/protobuf/com/example/userdata/grpc/Login.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/generated-sources/protobuf/com/example/userdata/grpc/UserDataServiceGrpc.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/target/generated-sources/protobuf/com/example/userdata/grpc/UserLoginRequest.java

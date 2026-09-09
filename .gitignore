@@ -1,3 +1,6 @@
+gen/
+mysql/
+
 HELP.md
 target/
 mysql/

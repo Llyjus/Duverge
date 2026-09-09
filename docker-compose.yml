@@ -5,41 +5,56 @@ services:
     ports:
       - "26526:26526" 
     depends_on:
-      - game
-      - room
-      - userData
+      # - game
+      # - room
+      - userdata
     networks:
       - game-net
 
-  game:
-    build: ./game
-    container_name: game
-    networks:
-      - game-net
+  # game:
+  #   build: ./game
+  #   container_name: game
+  #   networks:
+  #     - game-net
 
-  room:
-    build: ./room
-    container_name: room
-    networks:
-      - game-net
+  # room:
+  #   build: ./room
+  #   container_name: room
+  #   networks:
+  #     - game-net
 
-  userData:
+  userdata:
     build: ./userData   
-    container_name: userData
+    container_name: userdata
     networks:
       - game-net
 
-  test:
-    build: ./test
-    container_name: test
-    depends_on:
-      - game
-      - room
-      - userData
-      - gateway
+  # test:
+  #   build: ./test
+  #   container_name: test
+  #   depends_on:
+  #     - game
+  #     - room
+  #     - userdata
+  #     - gateway
+  #   networks:
+  #     - game-net
+
+  mysql:
+    image: mysql:8.4
+    container_name: user-data-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: user_data
+      MYSQL_USER: rin
+      MYSQL_PASSWORD: llyjus
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+    ports:
+      - "3306:3306"
     networks:
       - game-net
-
+      
 networks:
   game-net:
     driver: bridge
