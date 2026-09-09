@@ -3,9 +3,9 @@ spring:
     name: userdata
 
   datasource:
-    url: jdbc:mysql://mysql:3306/${ MYSQL_DATABASE }
-    username: ${ MYSQL_USER }
-    password: ${ MYSQL_PASSWORD }
+    url: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -16,7 +16,7 @@ spring:
   grpc:
     server:
       port: 9090
-      
+
   data:
     redis:
       host: redis
