@@ -28,6 +28,9 @@ services:
     container_name: userdata
     networks:
       - game-net
+    depends_on:
+      - mysql
+      - redis
 
   # test:
   #   build: ./test
@@ -52,6 +55,14 @@ services:
       - ./mysql/data:/var/lib/mysql
     ports:
       - "3306:3306"
+    networks:
+      - game-net
+
+  redis:
+    image: redis:latest
+    container_name: user-data-redis
+    ports:
+      - "6379:6379"
     networks:
       - game-net
       
