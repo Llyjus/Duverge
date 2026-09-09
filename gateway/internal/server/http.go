@@ -2,15 +2,16 @@ package server
 
 import (
 	"fmt"
+	"gateway/internal/client/userdata"
 	"gateway/internal/router"
 	"net/http"
 )
 
-func HttpServer() {
+func HttpServer(userDataClient *userdata.Client) {
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
 		Addr:    "127.0.0.1:26526",
-		Handler: router.NewHTTPRouter(),
+		Handler: router.NewHTTPRouter(userDataClient),
 	}
 
 	go func() {
