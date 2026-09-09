@@ -45,7 +45,10 @@ func HandleLogin(userDataClient *userdata.Client) http.HandlerFunc {
 			res, err = register(userDataClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
-				http.Error(w, "Error occurred while registering", http.StatusInternalServerError)
+				http.Error(
+					w,
+					"Error occurred while registering",
+					http.StatusInternalServerError)
 				return
 			}
 

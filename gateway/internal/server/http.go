@@ -10,7 +10,7 @@ import (
 func HttpServer(userDataClient *userdata.Client) {
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
-		Addr:    "127.0.0.1:26526",
+		Addr:    "0.0.0.0:26526",
 		Handler: router.NewHTTPRouter(userDataClient),
 	}
 
