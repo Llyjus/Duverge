@@ -1,4 +1,5 @@
 gen/
+mysql/
 
 HELP.md
 target/

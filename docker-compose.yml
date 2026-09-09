@@ -5,23 +5,23 @@ services:
     ports:
       - "26526:26526" 
     depends_on:
-      - game
-      - room
+      # - game
+      # - room
       - userdata
     networks:
       - game-net
 
-  game:
-    build: ./game
-    container_name: game
-    networks:
-      - game-net
+  # game:
+  #   build: ./game
+  #   container_name: game
+  #   networks:
+  #     - game-net
 
-  room:
-    build: ./room
-    container_name: room
-    networks:
-      - game-net
+  # room:
+  #   build: ./room
+  #   container_name: room
+  #   networks:
+  #     - game-net
 
   userdata:
     build: ./userData   
@@ -29,16 +29,16 @@ services:
     networks:
       - game-net
 
-  test:
-    build: ./test
-    container_name: test
-    depends_on:
-      - game
-      - room
-      - userdata
-      - gateway
-    networks:
-      - game-net
+  # test:
+  #   build: ./test
+  #   container_name: test
+  #   depends_on:
+  #     - game
+  #     - room
+  #     - userdata
+  #     - gateway
+  #   networks:
+  #     - game-net
 
   mysql:
     image: mysql:8.4
