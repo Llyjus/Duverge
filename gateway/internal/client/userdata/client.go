@@ -12,6 +12,10 @@ type Client struct {
 	conn   *grpc.ClientConn
 }
 
+func (c *Client) GetClient() gen.UserDataServiceClient {
+	return c.client
+}
+
 func NewClient(addr string) (*Client, error) {
 	conn, err := grpc.NewClient(
 		addr,

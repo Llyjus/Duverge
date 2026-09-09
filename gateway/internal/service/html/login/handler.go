@@ -27,7 +27,13 @@ func HandleLogin(userDataClient *userdata.Client) http.HandlerFunc {
 		switch req.Type {
 
 		case "login":
-			res = login()
+			res, err = login(userDataClient, r.Context(), req.Username, req.Password)
+
+			if err != nil {
+				http.Error(w, "Error occurred while logging in", http.StatusInternalServerError)
+				return
+			}
+
 			switch res {
 			case true:
 				w.Write([]byte("Login successful"))
@@ -36,7 +42,13 @@ func HandleLogin(userDataClient *userdata.Client) http.HandlerFunc {
 			}
 
 		case "register":
-			res = register(userDataClient, req.Username, req.Password)
+			res, err = register(userDataClient, r.Context(), req.Username, req.Password)
+
+			if err != nil {
+				http.Error(w, "Error occurred while registering", http.StatusInternalServerError)
+				return
+			}
+
 			switch res {
 			case true:
 				w.Write([]byte("Registration successful"))
