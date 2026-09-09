@@ -11,7 +11,7 @@ COPY . .
 
 RUN go build \
 -o gateway \
-./cmd/main.go
+./cmd/server/main.go
 
 EXPOSE 26526
 EXPOSE 26527
