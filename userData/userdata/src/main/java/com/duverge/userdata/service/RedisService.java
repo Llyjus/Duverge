@@ -1,8 +1,9 @@
 package com.duverge.userdata.service;
 
+import java.time.Duration;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import java.time.Duration;
 
 @Service
 public class RedisService {
@@ -22,7 +23,7 @@ public class RedisService {
     public String getLoginSession(String sessionId) {
         if (sessionId == null || sessionId.isEmpty()) {
             return null;
-        };
+        }
         
         // Reset the expiration time
         redisTemplate.expire(sessionId, Duration.ofDays(7));
