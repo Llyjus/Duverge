@@ -66,6 +66,13 @@ services:
     networks:
       - game-net
 
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - game-net
+
   redis:
     image: redis:latest
     container_name: redis
