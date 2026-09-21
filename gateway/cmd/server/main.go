@@ -18,6 +18,7 @@ func main() {
 
 	// Create a new redis client
 	redisClient := redis_client.NewClient()
+	defer redisClient.Close()
 
 	// Create a new userdata client
 	userDataClient, err := userdata.NewClient("userdata:9090")
