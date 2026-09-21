@@ -3,17 +3,21 @@ package login
 import (
 	"context"
 	"gateway/internal/client/userdata"
+	"gateway/internal/service/auth"
 	gen "gateway/proto/userdata/gen"
+
+	redis "github.com/redis/go-redis/v9"
 )
 
 func login(
 	userDataClient *userdata.Client,
+	redisClient *redis.Client,
 	context context.Context,
-	username,
-	password string) (bool, error) {
+	accountId string,
+	password string) (string, error) {
 
 	req := &gen.UserLoginRequest{
-		AccountId: username,
+		AccountId: accountId,
 		Password:  password,
 	}
 
@@ -23,8 +27,15 @@ func login(
 	)
 
 	if err != nil || res == nil {
-		return false, err
+		return "", err
+	}
+	// Store the session ID in Redis
+	sessionId, err := auth.SessionCreation(redisClient,
+		res.SessionId,
+		accountId)
+	if err != nil || sessionId == "" {
+		return "", err
 	}
 
-	return res.Result, nil
+	return sessionId, nil
 }

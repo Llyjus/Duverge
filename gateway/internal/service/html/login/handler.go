@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"gateway/internal/client/userdata"
 	"net/http"
+
+	redis "github.com/redis/go-redis/v9"
 )
 
-func HandleLogin(userDataClient *userdata.Client) http.HandlerFunc {
+func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Received login request")
 
@@ -23,11 +25,11 @@ func HandleLogin(userDataClient *userdata.Client) http.HandlerFunc {
 			return
 		}
 
-		var res bool
 		switch req.Type {
 
 		case "login":
-			res, err = login(userDataClient, r.Context(), req.Username, req.Password)
+			var res string
+			res, err = login(userDataClient, redisClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
 				http.Error(w, "Error occurred while logging in", http.StatusInternalServerError)
@@ -35,13 +37,23 @@ func HandleLogin(userDataClient *userdata.Client) http.HandlerFunc {
 			}
 
 			switch res {
-			case true:
-				w.Write([]byte("Login successful"))
-			case false:
+			case "":
 				http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+			default:
+
+				type LoginResponse struct {
+					SessionID string `json:"sessionId"`
+				}
+				response := LoginResponse{
+					SessionID: res,
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
 			}
 
 		case "register":
+			var res bool
 			res, err = register(userDataClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {

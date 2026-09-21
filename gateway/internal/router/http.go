@@ -13,7 +13,7 @@ import (
 func NewHTTPRouter(userDataClient *userdata.Client, redisClient *redis.Client) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/login", login.HandleLogin(userDataClient))
+	mux.HandleFunc("/login", login.HandleLogin(userDataClient, redisClient))
 	mux.HandleFunc("/health", health.HandleHealth)
 
 	mux.HandleFunc("/login_session", sessionLogin.HandleLoginSession(redisClient))
