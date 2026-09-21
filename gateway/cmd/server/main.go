@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"gateway/internal/client/redis_client"
 	"gateway/internal/client/userdata"
@@ -19,6 +20,12 @@ func main() {
 	// Create a new redis client
 	redisClient := redis_client.NewClient()
 	defer redisClient.Close()
+
+	// Test the Redis connection
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		fmt.Println("Error connecting to Redis:", err)
+		return
+	}
 
 	// Create a new userdata client
 	userDataClient, err := userdata.NewClient("userdata:9090")
