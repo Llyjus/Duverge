@@ -6,6 +6,8 @@ import com.duverge.userdata.service.UserService;
 import com.example.userdata.grpc.UserDataServiceGrpc;
 import com.example.userdata.grpc.UserLoginRequest;
 import com.example.userdata.grpc.UserLoginResponse;
+import com.example.userdata.grpc.UserRegistrationRequest;
+import com.example.userdata.grpc.UserRegistrationResponse;
 
 import io.grpc.stub.StreamObserver;
 
@@ -35,12 +37,12 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
 
     @Override
     public void userRegistration(
-            com.example.userdata.grpc.UserRegistrationRequest request,
-            StreamObserver<com.example.userdata.grpc.UserRegistrationResponse> responseObserver) {
+            UserRegistrationRequest request,
+            StreamObserver<UserRegistrationResponse> responseObserver) {
 
         boolean userSetResult = userService.setNewUser(request.getAccountId(), request.getPassword());
 
-        com.example.userdata.grpc.UserRegistrationResponse response = com.example.userdata.grpc.UserRegistrationResponse.newBuilder()
+        UserRegistrationResponse response = UserRegistrationResponse.newBuilder()
                 .setResult(userSetResult)
                 .build();
 

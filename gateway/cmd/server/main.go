@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gateway/internal/client/redis_client"
 	"gateway/internal/client/userdata"
 	"gateway/internal/server"
 	"os"
@@ -15,6 +16,9 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
+	// Create a new redis client
+	redisClient := redis_client.NewClient()
+
 	// Create a new userdata client
 	userDataClient, err := userdata.NewClient("userdata:9090")
 	if err != nil {
@@ -24,7 +28,7 @@ func main() {
 	defer userDataClient.Close()
 
 	// Start the HTTP server
-	server.HttpServer(userDataClient)
+	server.HttpServer(userDataClient, redisClient)
 
 	// Start the TCP server
 	server.TcpServer()

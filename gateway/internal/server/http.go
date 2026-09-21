@@ -5,13 +5,15 @@ import (
 	"gateway/internal/client/userdata"
 	"gateway/internal/router"
 	"net/http"
+
+	redis "github.com/redis/go-redis/v9"
 )
 
-func HttpServer(userDataClient *userdata.Client) {
+func HttpServer(userDataClient *userdata.Client, redisClient *redis.Client) {
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
 		Addr:    "0.0.0.0:26526",
-		Handler: router.NewHTTPRouter(userDataClient),
+		Handler: router.NewHTTPRouter(userDataClient, redisClient),
 	}
 
 	go func() {

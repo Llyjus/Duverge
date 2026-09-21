@@ -10,6 +10,8 @@ services:
       - userdata
     networks:
       - game-net
+    environment:
+      - REDIS_ADDR=redis:6379
 
   # game:
   #   build: ./game
@@ -24,13 +26,21 @@ services:
   #     - game-net
 
   userdata:
-    build: ./userData   
+    build:
+      context: ./userData
+      dockerfile: Dockerfile
     container_name: userdata
+    environment:
+        MYSQL_DATABASE: ${MYSQL_DATABASE}
+        MYSQL_USER: ${MYSQL_USER}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_started
     networks:
       - game-net
-    depends_on:
-      - mysql
-      - redis
 
   # test:
   #   build: ./test
@@ -45,12 +55,12 @@ services:
 
   mysql:
     image: mysql:8.4
-    container_name: user-data-mysql
+    container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${ MYSQL_ROOT_PASSWORD }
-      MYSQL_DATABASE: ${ MYSQL_DATABASE }
-      MYSQL_USER: ${ MYSQL_USER }
-      MYSQL_PASSWORD: ${ MYSQL_PASSWORD }
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - ./mysql/data:/var/lib/mysql
     ports:
@@ -58,14 +68,29 @@ services:
     networks:
       - game-net
 
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - game-net
+
   redis:
     image: redis:latest
-    container_name: user-data-redis
+    container_name: redis
     ports:
       - "6379:6379"
     networks:
       - game-net
+
+  redisinsight:
+    image: redislabs/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5540:5540"
+    networks:
+      - game-net
       
-networks:
+networks: 
   game-net:
     driver: bridge
