@@ -27,4 +27,5 @@ message UserLoginRequest {
 
 message UserLoginResponse {
   bool result = 1;
+  string session_id = 2;
 }
