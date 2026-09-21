@@ -1,7 +1,9 @@
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/UserdataApplication.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/entity/User.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/grpc/UserServer.java
+/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/internal/RandomSession.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/repository/UserRepository.java
+/Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/service/RedisService.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/service/UserService.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/test/GrpcTester.java
 /Users/Admin/Documents/project/Duverge/Duverge/userData/userdata/src/main/java/com/duverge/userdata/test/WriteInTester.java

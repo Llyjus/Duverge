@@ -55,19 +55,19 @@ public final class Login extends com.google.protobuf.GeneratedFile {
       descriptor;
   static {
     java.lang.String[] descriptorData = {
-      "\n\025user_info/login.proto\022\tuser_info\"?\n\027Us" +
-      "erRegistrationRequest\022\022\n\naccount_id\030\001 \001(" +
-      "\t\022\020\n\010password\030\002 \001(\t\"*\n\030UserRegistrationR" +
-      "esponse\022\016\n\006result\030\001 \001(\010\"8\n\020UserLoginRequ" +
-      "est\022\022\n\naccount_id\030\001 \001(\t\022\020\n\010password\030\002 \001(" +
-      "\t\"#\n\021UserLoginResponse\022\016\n\006result\030\001 \001(\0102\272" +
-      "\001\n\017UserDataService\022]\n\020UserRegistration\022\"" +
-      ".user_info.UserRegistrationRequest\032#.use" +
-      "r_info.UserRegistrationResponse\"\000\022H\n\tUse" +
-      "rLogin\022\033.user_info.UserLoginRequest\032\034.us" +
-      "er_info.UserLoginResponse\"\000B9\n\031com.examp" +
-      "le.userdata.grpcP\001Z\032gateway/proto/userda" +
-      "ta/genb\006proto3"
+      "\n\013login.proto\022\tuser_info\"?\n\027UserRegistra" +
+      "tionRequest\022\022\n\naccount_id\030\001 \001(\t\022\020\n\010passw" +
+      "ord\030\002 \001(\t\"*\n\030UserRegistrationResponse\022\016\n" +
+      "\006result\030\001 \001(\010\"8\n\020UserLoginRequest\022\022\n\nacc" +
+      "ount_id\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\"7\n\021UserL" +
+      "oginResponse\022\016\n\006result\030\001 \001(\010\022\022\n\nsession_" +
+      "id\030\002 \001(\t2\272\001\n\017UserDataService\022]\n\020UserRegi" +
+      "stration\022\".user_info.UserRegistrationReq" +
+      "uest\032#.user_info.UserRegistrationRespons" +
+      "e\"\000\022H\n\tUserLogin\022\033.user_info.UserLoginRe" +
+      "quest\032\034.user_info.UserLoginResponse\"\000B9\n" +
+      "\031com.example.userdata.grpcP\001Z\032gateway/pr" +
+      "oto/userdata/genb\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -96,7 +96,7 @@ public final class Login extends com.google.protobuf.GeneratedFile {
     internal_static_user_info_UserLoginResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_user_info_UserLoginResponse_descriptor,
-        new java.lang.String[] { "Result", });
+        new java.lang.String[] { "Result", "SessionId", });
     descriptor.resolveAllFeaturesImmutable();
   }
 

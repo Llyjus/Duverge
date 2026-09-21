@@ -15,4 +15,16 @@ public interface UserLoginResponseOrBuilder extends
    * @return The result.
    */
   boolean getResult();
+
+  /**
+   * <code>string session_id = 2;</code>
+   * @return The sessionId.
+   */
+  java.lang.String getSessionId();
+  /**
+   * <code>string session_id = 2;</code>
+   * @return The bytes for sessionId.
+   */
+  com.google.protobuf.ByteString
+      getSessionIdBytes();
 }

@@ -5,7 +5,7 @@ import java.util.Base64;
 
 
 public class RandomSession {
-    public String generateSession() {
+    public static String generateSessionID() {
         SecureRandom random = new SecureRandom();
 
         byte[] bytes = new byte[32];

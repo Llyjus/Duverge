@@ -2,6 +2,7 @@ package com.duverge.userdata.grpc;
 
 import org.springframework.grpc.server.service.GrpcService;
 
+import com.duverge.userdata.internal.RandomSession;
 import com.duverge.userdata.service.UserService;
 import com.example.userdata.grpc.UserDataServiceGrpc;
 import com.example.userdata.grpc.UserLoginRequest;
@@ -25,10 +26,17 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
             StreamObserver<UserLoginResponse> responseObserver) {
 
         boolean userCheckResult = userService.checkUser(request.getAccountId(), request.getPassword());
+        
+        var sessionId = "";
+        if (userCheckResult) {
+            // If the user check is successful, create a session ID
+            sessionId = RandomSession.generateSessionID();
             
+        }
 
         UserLoginResponse response = UserLoginResponse.newBuilder()
                 .setResult(userCheckResult)
+                .setSessionId(sessionId)
                 .build();
 
         responseObserver.onNext(response);
