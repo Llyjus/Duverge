@@ -54,7 +54,7 @@ func SessionCreation(
 	if err != nil {
 		return "", err
 	}
-	sessionID = strings.TrimPrefix(sessionID, "session:")
+	sessionID = strings.TrimPrefix(sessionID, "session=")
 
 	return sessionID, nil
 }
