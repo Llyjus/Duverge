@@ -1,7 +1,3 @@
-gen/
-mysql/
-.env
-
 HELP.md
 target/
 mysql/
