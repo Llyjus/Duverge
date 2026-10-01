@@ -27,6 +27,7 @@ func SessionCreation(
 		}
 	}
 
+	// set the session ID and account ID in Redis with an expiration time of 7 days
 	err = redisClient.Set(
 		context.Background(),
 		sessionID,
