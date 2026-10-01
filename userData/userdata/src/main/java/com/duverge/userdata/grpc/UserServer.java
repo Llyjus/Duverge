@@ -25,7 +25,9 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
             UserLoginRequest request,
             StreamObserver<UserLoginResponse> responseObserver) {
 
-        boolean userCheckResult = userService.checkUser(request.getAccountId(), request.getPassword());
+        boolean userCheckResult = userService.checkUser(
+            request.getAccountId(), 
+            request.getPassword());
         
         var sessionId = "";
         if (userCheckResult) {
@@ -48,7 +50,9 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
             UserRegistrationRequest request,
             StreamObserver<UserRegistrationResponse> responseObserver) {
 
-        boolean userSetResult = userService.setNewUser(request.getAccountId(), request.getPassword());
+        boolean userSetResult = userService.setNewUser(
+            request.getAccountId(), 
+            request.getPassword());
 
         UserRegistrationResponse response = UserRegistrationResponse.newBuilder()
                 .setResult(userSetResult)
