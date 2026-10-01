@@ -15,6 +15,7 @@ func SessionCreation(
 ) (string, error) {
 
 	// Check if the session already exists
+	accountID = "session_account=" + accountID
 	session, err := redisClient.Get(context.Background(), accountID).Result()
 	if err != redis.Nil && err != nil {
 		return "", err
@@ -70,6 +71,6 @@ func SessionAuthentication(
 	if err != nil && err != redis.Nil {
 		return "", err
 	}
-
+	accountID = strings.TrimPrefix(accountID, "session_account=")
 	return accountID, nil
 }
