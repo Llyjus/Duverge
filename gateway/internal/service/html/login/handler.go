@@ -43,6 +43,7 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			default:
 
 				response := serverresponse.LoginResponse{
+					Success:   true,
 					SessionID: res,
 				}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gateway/internal/service/auth"
+	serverresponse "gateway/internal/service/html/serverResponse"
 	"net/http"
 
 	redis "github.com/redis/go-redis/v9"
@@ -23,13 +24,28 @@ func HandleLoginSession(redisClient *redis.Client) http.HandlerFunc {
 			return
 		}
 
+		// Authenticate the session ID
 		accountID, err := auth.SessionAuthentication(redisClient, req.SessionID)
 		if err != nil {
 			http.Error(w, "Invalid session ID", http.StatusUnauthorized)
 			return
 		}
 
-		fmt.Println("Authenticated user:", accountID)
+		// Create the response
+		var response serverresponse.SessionLoginResponse
+		if accountID == "" {
+			response = serverresponse.SessionLoginResponse{
+				Success: false,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+		} else {
+			response = serverresponse.SessionLoginResponse{
+				Success: true,
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
 
 	}
 }
