@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	redis "github.com/redis/go-redis/v9"
@@ -20,7 +21,6 @@ func SessionCreation(
 	}
 
 	if session != "" {
-		session = "session=" + session
 		// Delete the existing session and account ID from Redis
 		err = redisClient.Del(context.Background(), session).Err()
 		err = redisClient.Del(context.Background(), accountID).Err()
@@ -54,6 +54,7 @@ func SessionCreation(
 	if err != nil {
 		return "", err
 	}
+	sessionID = strings.TrimPrefix(sessionID, "session:")
 
 	return sessionID, nil
 }
