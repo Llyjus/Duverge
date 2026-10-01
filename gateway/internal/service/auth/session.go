@@ -20,10 +20,35 @@ func SessionCreation(
 		7*24*time.Hour,
 	).Err()
 
+	err2 := redisClient.Set(
+		context.Background(),
+		accountID,
+		sessionID,
+		7*24*time.Hour,
+	).Err()
+
+	if err != nil || err2 != nil {
+		return "", err
+	}
+
+	return sessionID, nil
+}
+
+func SessionDeletion(
+	redisClient *redis.Client,
+	accountID string,
+) (string, error) {
+	// Find the sessionID associated with the accountID
+	sessionID, err := redisClient.Get(context.Background(), accountID).Result()
 	if err != nil {
 		return "", err
 	}
 
+	err2 := redisClient.Del(context.Background(), sessionID).Err()
+	err3 := redisClient.Del(context.Background(), accountID).Err()
+	if err2 != nil || err3 != nil {
+		return "", err
+	}
 	return sessionID, nil
 }
 
