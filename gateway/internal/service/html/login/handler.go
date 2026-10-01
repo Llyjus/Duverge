@@ -64,7 +64,12 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 
 			switch res {
 			case true:
-				w.Write([]byte("Registration successful"))
+				response := serverresponse.RegisterResponse{
+					Success: true,
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
 			case false:
 				http.Error(w, "Account already exists", http.StatusUnauthorized)
 			}
