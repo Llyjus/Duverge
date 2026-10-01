@@ -13,42 +13,42 @@ func SessionCreation(
 	accountID string,
 ) (string, error) {
 
-	err := redisClient.Set(
-		context.Background(),
-		sessionID,
-		accountID,
-		7*24*time.Hour,
-	).Err()
-
-	err2 := redisClient.Set(
-		context.Background(),
-		accountID,
-		sessionID,
-		7*24*time.Hour,
-	).Err()
-
-	if err != nil || err2 != nil {
+	// Check if the session already exists
+	session, err := redisClient.Get(context.Background(), accountID).Result()
+	if err != redis.Nil && err != nil {
 		return "", err
 	}
 
-	return sessionID, nil
-}
+	if session != "" {
+		err = redisClient.Del(context.Background(), session).Err()
+		err = redisClient.Del(context.Background(), accountID).Err()
+		if err != nil {
+			return "", err
+		}
+	}
 
-func SessionDeletion(
-	redisClient *redis.Client,
-	accountID string,
-) (string, error) {
-	// Find the sessionID associated with the accountID
-	sessionID, err := redisClient.Get(context.Background(), accountID).Result()
+	err = redisClient.Set(
+		context.Background(),
+		sessionID,
+		accountID,
+		7*24*time.Hour,
+	).Err()
+
 	if err != nil {
 		return "", err
 	}
 
-	err2 := redisClient.Del(context.Background(), sessionID).Err()
-	err3 := redisClient.Del(context.Background(), accountID).Err()
-	if err2 != nil || err3 != nil {
+	err = redisClient.Set(
+		context.Background(),
+		accountID,
+		sessionID,
+		7*24*time.Hour,
+	).Err()
+
+	if err != nil {
 		return "", err
 	}
+
 	return sessionID, nil
 }
 
@@ -58,7 +58,7 @@ func SessionAuthentication(
 ) (string, error) {
 
 	accountID, err := redisClient.Get(context.Background(), session).Result()
-	if err != nil {
+	if err != nil && err != redis.Nil {
 		return "", err
 	}
 
