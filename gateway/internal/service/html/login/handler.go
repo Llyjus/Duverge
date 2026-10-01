@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gateway/internal/client/userdata"
+	serverresponse "gateway/internal/service/html/serverResponse"
 	"net/http"
 
 	redis "github.com/redis/go-redis/v9"
@@ -41,10 +42,7 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 				http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 			default:
 
-				type LoginResponse struct {
-					SessionID string `json:"sessionId"`
-				}
-				response := LoginResponse{
+				response := serverresponse.LoginResponse{
 					SessionID: res,
 				}
 
