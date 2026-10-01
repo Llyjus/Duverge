@@ -34,11 +34,7 @@ func HandleLoginSession(redisClient *redis.Client) http.HandlerFunc {
 		// Create the response
 		var response serverresponse.SessionLoginResponse
 		if accountID == "" {
-			response = serverresponse.SessionLoginResponse{
-				Success: false,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			http.Error(w, "Invalid session ID or session expired", http.StatusUnauthorized)
 		} else {
 			response = serverresponse.SessionLoginResponse{
 				Success: true,

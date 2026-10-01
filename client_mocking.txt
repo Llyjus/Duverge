@@ -17,5 +17,5 @@ curl -X POST http://localhost:26526/login \
 curl -X POST http://localhost:26526/login_session \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionId": "MDSlVkUVNSZ6JYl16qp4yilLbBaeBL7l5vU1yMF4ZHU"
+    "sessionId": "81JULSrQtQW3baMSUl-4HIBfw3WrQ4mPuj_XmAx74h4"
   }'
