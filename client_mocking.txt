@@ -1,0 +1,21 @@
+curl -X POST http://localhost:26526/login \
+  -H "Content-Type: application/json" \
+  -d '{
+  "type": "register",
+  "accountId": "testuser",
+  "password": "123456"
+}'
+
+curl -X POST http://localhost:26526/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "login",
+    "accountId": "testuser",
+    "password": "123456"
+  }'
+
+curl -X POST http://localhost:26526/login_session \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "MDSlVkUVNSZ6JYl16qp4yilLbBaeBL7l5vU1yMF4ZHU"
+  }'
