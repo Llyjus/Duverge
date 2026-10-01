@@ -20,12 +20,17 @@ func SessionCreation(
 	}
 
 	if session != "" {
+		session = "session=" + session
+		// Delete the existing session and account ID from Redis
 		err = redisClient.Del(context.Background(), session).Err()
 		err = redisClient.Del(context.Background(), accountID).Err()
 		if err != nil {
 			return "", err
 		}
 	}
+
+	// add the pre to sessionID
+	sessionID = "session=" + sessionID
 
 	// set the session ID and account ID in Redis with an expiration time of 7 days
 	err = redisClient.Set(
@@ -57,6 +62,8 @@ func SessionAuthentication(
 	redisClient *redis.Client,
 	session string,
 ) (string, error) {
+
+	session = "session=" + session
 
 	accountID, err := redisClient.Get(context.Background(), session).Result()
 	if err != nil && err != redis.Nil {
