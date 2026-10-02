@@ -3,6 +3,7 @@ package com.duverge.userdata.service;
 import org.springframework.stereotype.Service;
 
 import com.duverge.userdata.entity.User;
+import com.duverge.userdata.internal.Encoder;
 import com.duverge.userdata.repository.UserRepository;
 
 @Service
@@ -24,7 +25,7 @@ public class UserService {
         }
 
         user.setAccountId(accountId);
-        user.setPassword(password);
+        user.setPassword(Encoder.encode(password));
 
         userRepository.save(user);
         // deal with false of connection
@@ -47,7 +48,7 @@ public class UserService {
         if (user == null) {
             return false;
         }
-        return user.getPassword().equals(password);
+        return Encoder.matches(password, user.getPassword());
     }
 
     public User getUser(String accountId) {
