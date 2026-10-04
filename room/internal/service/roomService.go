@@ -10,7 +10,8 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-func CreateRoom(client *redis.Client,
+func CreateRoom(
+	client *redis.Client,
 	HosterID string,
 ) (roomId string,
 	err error) {
@@ -48,7 +49,12 @@ func CreateRoom(client *redis.Client,
 
 }
 
-func GetRoom(client *redis.Client, roomId string) (*entity.Room, error) {
+func GetRoom(
+	client *redis.Client,
+	roomId string,
+) (
+	*entity.Room,
+	error) {
 	roomKey := "room:" + roomId
 
 	// Get the room from Redis
@@ -67,4 +73,23 @@ func GetRoom(client *redis.Client, roomId string) (*entity.Room, error) {
 	}
 
 	return &room, nil
+}
+
+func UpdateRoom(
+	client *redis.Client,
+	room *entity.Room,
+) error {
+	roomKey := "room:" + room.RoomID
+
+	roomJSON, err := json.Marshal(room)
+	if err != nil {
+		return err
+	}
+
+	return client.Set(
+		context.Background(),
+		roomKey,
+		roomJSON,
+		0,
+	).Err()
 }
