@@ -1,7 +1,7 @@
 package entity
 
 type Room struct {
-	RoomID      int64    `json:"roomId"`
+	RoomID      string   `json:"roomId"`
 	MaximumSize int64    `json:"maximumSize"`
 	UserIDs     []string `json:"userIds"`
 	HosterID    string   `json:"hosterId"`
