@@ -47,3 +47,22 @@ func CreateRoom(client *redis.Client,
 	}
 
 }
+
+func GetRoom(client *redis.Client, roomId string) (*entity.Room, error) {
+	roomKey := "room:" + roomId
+
+	// Get the room from Redis
+	roomJSON, err := client.Get(context.Background(), roomKey).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the JSON into a Room struct
+	var room entity.Room
+	err = json.Unmarshal([]byte(roomJSON), &room)
+	if err != nil {
+		return nil, err
+	}
+
+	return &room, nil
+}
