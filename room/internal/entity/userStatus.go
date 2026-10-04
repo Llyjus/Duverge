@@ -5,4 +5,4 @@ type UserStatus struct {
 	Status string `json:"status"`
 }
 
-// status: "free", "in_room", "in_game"
+// status: "in_lobby", "in_room", "in_game"
