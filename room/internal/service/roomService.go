@@ -93,3 +93,12 @@ func UpdateRoom(
 		0,
 	).Err()
 }
+
+func DeleteRoom(
+	client *redis.Client,
+	roomId string,
+) error {
+	roomKey := "room:" + roomId
+
+	return client.Del(context.Background(), roomKey).Err()
+}
