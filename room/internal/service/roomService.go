@@ -53,7 +53,9 @@ func GetRoom(client *redis.Client, roomId string) (*entity.Room, error) {
 
 	// Get the room from Redis
 	roomJSON, err := client.Get(context.Background(), roomKey).Result()
-	if err != nil {
+	if err == redis.Nil {
+		return nil, nil // Room not found
+	} else if err != nil {
 		return nil, err
 	}
 
