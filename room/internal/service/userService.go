@@ -1,8 +1,6 @@
 package service
 
 import (
-	"context"
-	"encoding/json"
 	"room/internal/operation"
 
 	redis "github.com/redis/go-redis/v9"
@@ -46,12 +44,10 @@ func AddUserToRoom(
 	}
 
 	// Update the room in Redis
-	roomJSON, err := json.Marshal(room)
+	err = UpdateRoom(client, room)
 	if err != nil {
 		return err
 	}
-	return client.Set(context.Background(),
-		roomKey,
-		roomJSON,
-		0).Err()
+
+	return nil
 }
