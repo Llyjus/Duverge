@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"room/internal/entity"
+	"room/internal/function"
 
 	redis "github.com/redis/go-redis/v9"
 )
@@ -53,4 +54,38 @@ func UpdateUserStatus(
 		userStatusKey,
 		userStatusJSON,
 		0).Err()
+}
+
+func CheckHoster(
+	room *entity.Room,
+	userId string,
+) (bool, error) {
+	return room.HosterID == userId, nil
+}
+
+func RandomHoster(
+	room *entity.Room,
+) (*entity.Room, error) {
+
+	// Randomly select a new hoster from the remaining users
+	newHosterID := function.RandomChoice(room.UserIDs)
+	room.HosterID = newHosterID
+
+	return room, nil
+}
+
+func DeleteUser(
+	room *entity.Room,
+	userId string,
+) error {
+
+	// Remove the user from the room
+	for i, id := range room.UserIDs {
+		if id == userId {
+			room.UserIDs = append(room.UserIDs[:i], room.UserIDs[i+1:]...)
+			break
+		}
+	}
+
+	return nil
 }
