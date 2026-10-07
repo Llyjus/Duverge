@@ -23,7 +23,7 @@ func CreateRoom(
 		MaximumSize: 4,
 		UserIDs:     []string{HosterID},
 		HosterID:    HosterID,
-		Status:      "waiting",
+		Status:      entity.RoomStatusWaiting,
 	}
 
 	for {
