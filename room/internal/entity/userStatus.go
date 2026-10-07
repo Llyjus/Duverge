@@ -5,4 +5,9 @@ type UserStatus struct {
 	Status string `json:"status"`
 }
 
-// status: "in_lobby", "in_room", "in_game"
+const (
+	// status: "in_lobby", "in_room", "in_game"
+	UserStatusInLobby = "in_lobby"
+	UserStatusInRoom  = "in_room"
+	UserStatusInGame  = "in_game"
+)
