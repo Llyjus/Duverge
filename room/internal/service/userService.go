@@ -1,6 +1,7 @@
 package service
 
 import (
+	"room/internal/entity"
 	"room/internal/operation"
 
 	redis "github.com/redis/go-redis/v9"
@@ -20,7 +21,7 @@ func AddUserToRoom(
 	}
 
 	// Check room status
-	if room.Status != "waiting" {
+	if room.Status != entity.RoomStatusWaiting {
 		return nil // Room is not in a state to accept new users
 	}
 	// // Check user status
@@ -29,7 +30,7 @@ func AddUserToRoom(
 		return err
 	}
 	// User is not in the lobby
-	if UserStatus != "in_lobby" {
+	if UserStatus != entity.UserStatusInLobby {
 		return nil // User is not in the lobby
 	}
 
@@ -37,7 +38,9 @@ func AddUserToRoom(
 	room.UserIDs = append(room.UserIDs, userId)
 
 	// Update the user's status
-	err = operation.UpdateUserStatus(client, userId, "in_room")
+	err = operation.UpdateUserStatus(client,
+		userId,
+		entity.UserStatusInRoom)
 	if err != nil {
 		return err
 	}
@@ -71,7 +74,7 @@ func DeleteUserFromRoom(
 	}
 
 	// Update the user's status to "in_lobby"
-	err = operation.UpdateUserStatus(client, userId, "in_lobby")
+	err = operation.UpdateUserStatus(client, userId, entity.UserStatusInLobby)
 	if err != nil {
 		return err
 	}
@@ -110,3 +113,5 @@ func DeleteUserFromRoom(
 
 	return nil
 }
+
+//TODO: add finite status machine to user status and room status, to avoid invalid state transition
