@@ -8,6 +8,6 @@ RUN go mod download
 
 RUN go build \
 -o room \
-./cmd/main.go
+./cmd/server/main.go
 
 CMD ["./room"]
