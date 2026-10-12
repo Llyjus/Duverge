@@ -59,7 +59,7 @@ func DeleteUserFromRoom(
 	if err != nil {
 		return err
 	}
-	if !res {
+	if res {
 		return operation.DeleteRoom(client, roomId)
 	}
 
