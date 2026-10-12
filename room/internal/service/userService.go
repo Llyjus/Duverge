@@ -1,7 +1,6 @@
 package service
 
 import (
-	"room/internal/entity"
 	"room/internal/operation"
 
 	redis "github.com/redis/go-redis/v9"
@@ -12,46 +11,21 @@ func AddUserToRoom(
 	roomId string,
 	userId string,
 ) error {
-	room, err := operation.GetRoom(client, roomId)
-	if err != nil {
-		return err
-	}
-	if room == nil {
-		return nil // Room not found
+	var err error
+
+	for i := 0; i < 3; i++ {
+		err = operation.JoinRoom(client, roomId, userId)
+
+		if err == nil {
+			return nil
+		}
+
+		if err != redis.TxFailedErr {
+			return err
+		}
 	}
 
-	// Check room status
-	if room.Status != entity.RoomStatusWaiting {
-		return nil // Room is not in a state to accept new users
-	}
-	// // Check user status
-	UserStatus, err := operation.CheckUserStatus(client, userId)
-	if err != nil {
-		return err
-	}
-	// User is not in the lobby
-	if UserStatus != entity.UserStatusInLobby {
-		return nil // User is not in the lobby
-	}
-
-	// Add the user to the room
-	room.UserIDs = append(room.UserIDs, userId)
-
-	// Update the user's status
-	err = operation.UpdateUserStatus(client,
-		userId,
-		entity.UserStatusInRoom)
-	if err != nil {
-		return err
-	}
-
-	// Update the room in Redis
-	err = operation.UpdateRoom(client, room)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func DeleteUserFromRoom(
@@ -59,59 +33,47 @@ func DeleteUserFromRoom(
 	roomId string,
 	userId string,
 ) error {
-	room, err := operation.GetRoom(client, roomId)
-	if err != nil {
-		return err
-	}
-	if room == nil {
-		return nil // Room not found
-	}
+	var err error
 
-	// Remove the user from the room
-	err = operation.DeleteUser(room, userId)
-	if err != nil {
-		return err
-	}
+	for i := 0; i < 3; i++ {
+		err = operation.ExitRoom(client, roomId, userId)
 
-	// Update the user's status to "in_lobby"
-	err = operation.UpdateUserStatus(client, userId, entity.UserStatusInLobby)
-	if err != nil {
-		return err
-	}
-
-	// Check if the room is empty after removing the user
-	isEmpty, err := operation.CheckRoomIsEmpty(room)
-	if err != nil {
-		return err
-	}
-	if isEmpty {
-		// Delete the room if it's empty
-		err = operation.DeleteRoom(client, roomId)
-		if err != nil {
-			return err
-		} else {
+		if err == nil {
 			return nil
 		}
-	}
 
-	// Check if the user is hoster
-	isHoster, err := operation.CheckHoster(room, userId)
-	if err != nil {
-		return err
-	}
-	if isHoster {
-		// Randomly select a new hoster from the remaining users
-		room, err = operation.RandomHoster(room)
-		if err != nil {
+		if err != redis.TxFailedErr {
 			return err
 		}
 	}
-	err = operation.UpdateRoom(client, room)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
-//TODO: add finite status machine to user status and room status, to avoid invalid state transition
+func SetUserPreparation(
+	client *redis.Client,
+	roomID string,
+	userId string,
+	targetIfPrepared bool,
+) error {
+	var err error
+
+	for i := 0; i < 3; i++ {
+		err = operation.SetPreparation(
+			client,
+			roomID,
+			userId,
+			targetIfPrepared,
+		)
+
+		if err == nil {
+			return nil
+		}
+
+		if err != redis.TxFailedErr {
+			return err
+		}
+	}
+
+	return err
+}
