@@ -81,3 +81,23 @@ func (s *RoomServer) GetRoomInfo(
 		UserIds: userIDs,
 	}, nil
 }
+
+func (s *RoomServer) SetPreparation(
+	ctx context.Context,
+	req *pb.SetPreparationRequest,
+) (*pb.SetPreparationResponse, error) {
+
+	err := service.SetUserPreparation(
+		s.client,
+		req.GetRoomId(),
+		req.GetUserId(),
+		req.GetTargetStatus(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.SetPreparationResponse{
+		Status: req.GetTargetStatus(),
+	}, nil
+}
