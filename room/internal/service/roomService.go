@@ -48,3 +48,25 @@ func CreateRoom(
 	}
 
 }
+
+func StartRoomGame(
+	client *redis.Client,
+	roomID string,
+	userId string,
+) error {
+	var err error
+
+	for i := 0; i < 3; i++ {
+		err = StartGame(client, roomID, userId)
+
+		if err == nil {
+			return nil
+		}
+
+		if err != redis.TxFailedErr {
+			return err
+		}
+	}
+
+	return err
+}
