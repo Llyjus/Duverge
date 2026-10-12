@@ -56,8 +56,7 @@ message SetPreparationRequest {
 }
 
 message SetPreparationResponse {
-  bool result = 1;
-  bool status = 2; // true for prepared
+  bool status = 1; // true for prepared
 }
 
 message StartGameRequest {
