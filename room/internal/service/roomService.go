@@ -58,7 +58,7 @@ func StartRoomGame(
 	var err error
 
 	for i := 0; i < 3; i++ {
-		err = StartGame(client, roomID, userId)
+		err = operation.StartGame(client, roomID, userId)
 
 		if err == nil {
 			return nil
