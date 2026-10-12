@@ -47,6 +47,22 @@ func DeleteUserFromRoom(
 		}
 	}
 
+	// check if the room is empty and delete it if necessary
+	room, err := operation.GetRoom(client, roomId)
+	if err != nil {
+		return err
+	}
+	if room == nil {
+		return nil
+	}
+	res, err := operation.CheckRoomIsEmpty(room)
+	if err != nil {
+		return err
+	}
+	if !res {
+		return operation.DeleteRoom(client, roomId)
+	}
+
 	return err
 }
 
