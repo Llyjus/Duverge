@@ -52,6 +52,7 @@ message LeaveRoomResponse {
 message SetPreparationRequest {
   string room_id = 1;
   string user_id = 2;
+  bool target_status = 3;
 }
 
 message SetPreparationResponse {
