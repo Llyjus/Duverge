@@ -49,6 +49,11 @@ func StartGame(
 			return errors.New("not all users are prepared")
 		}
 
+		// at least 2 players
+		if len(room.UserIDs) < 2 {
+			return errors.New("not enough players to start the game")
+		}
+
 		// Update room status
 		room.Status = entity.RoomStatusInGame
 
