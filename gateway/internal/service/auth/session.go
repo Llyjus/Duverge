@@ -74,3 +74,17 @@ func SessionAuthentication(
 	accountID = strings.TrimPrefix(accountID, "session_account=")
 	return accountID, nil
 }
+
+func GetUserIDFromSessionID(
+	redisClient *redis.Client,
+	ctx context.Context,
+	sessionID string,
+) (string, error) {
+	sessionKey := "session=" + sessionID
+	accountID, err := redisClient.Get(ctx, sessionKey).Result()
+	if err != nil {
+		return "", err
+	}
+	accountID = strings.TrimPrefix(accountID, "session_account=")
+	return accountID, nil
+}
