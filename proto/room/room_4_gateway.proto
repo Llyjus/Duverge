@@ -21,7 +21,6 @@ message GetRoomInfoRequest {
 message GetRoomInfoResponse {
   string room_id = 1;
   repeated string user_ids = 2;
-  string status = 3;
 }
 
 message CreateRoomRequest {
@@ -42,8 +41,7 @@ message JoinRoomResponse {
 }
 
 message LeaveRoomRequest {
-  string room_id = 1;
-  string user_id = 2;
+  bool result = 1;
 }
 
 message LeaveRoomResponse {
@@ -56,8 +54,7 @@ message SetPreparationRequest {
 }
 
 message SetPreparationResponse {
-  bool result = 1;
-  bool status = 2; // true for prepared
+  bool status = 1; // true for prepared
 }
 
 message StartGameRequest {

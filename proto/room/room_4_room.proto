@@ -21,7 +21,6 @@ message GetRoomInfoRequest {
 message GetRoomInfoResponse {
   string room_id = 1;
   repeated string user_ids = 2;
-  string status = 3;
 }
 
 message CreateRoomRequest {
