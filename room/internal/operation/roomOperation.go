@@ -3,6 +3,7 @@ package operation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"room/internal/entity"
 
@@ -67,4 +68,61 @@ func DeleteRoom(
 	roomKey := "room:" + roomId
 
 	return client.Del(context.Background(), roomKey).Err()
+}
+
+func EndGame(
+	client *redis.Client,
+	roomID string,
+) error {
+	ctx := context.Background()
+
+	room, err := GetRoom(client, roomID)
+	if err != nil {
+		return err
+	}
+
+	if room == nil {
+		return errors.New("room not found")
+	}
+
+	room.Status = entity.RoomStatusWaiting
+	room.Prepared = []string{}
+
+	roomJSON, err := json.Marshal(room)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+
+		pipe.Set(
+			ctx,
+			"room:"+roomID,
+			roomJSON,
+			0,
+		)
+
+		for _, userID := range room.UserIDs {
+			userStatus := entity.UserStatus{
+				UserID: userID,
+				Status: entity.UserStatusInRoom,
+			}
+
+			userStatusJSON, err := json.Marshal(userStatus)
+			if err != nil {
+				return err
+			}
+
+			pipe.Set(
+				ctx,
+				"user_status:"+userID,
+				userStatusJSON,
+				0,
+			)
+		}
+
+		return nil
+	})
+
+	return err
 }

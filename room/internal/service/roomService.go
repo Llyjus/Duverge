@@ -6,6 +6,7 @@ import (
 
 	"room/internal/entity"
 	"room/internal/function"
+	"room/internal/operation"
 
 	redis "github.com/redis/go-redis/v9"
 )
@@ -65,6 +66,23 @@ func StartRoomGame(
 
 		if err != redis.TxFailedErr {
 			return err
+		}
+	}
+
+	return err
+}
+
+func EndRoomGame(
+	client *redis.Client,
+	roomID string,
+) error {
+	var err error
+
+	for i := 0; i < 3; i++ {
+		err = operation.EndGame(client, roomID)
+
+		if err == nil {
+			return nil
 		}
 	}
 
