@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package room;
+
+option go_package = "room/proto/gen";
+
+service RoomService {
+  rpc GetRoomInfo(GetRoomInfoRequest) returns (GetRoomInfoResponse);
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+  rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
+  rpc LeaveRoom(LeaveRoomRequest) returns (LeaveRoomResponse);
+  rpc SetPreparation(SetPreparationRequest) returns (SetPreparationResponse);
+  rpc StartGame(StartGameRequest) returns (StartGameResponse);
+  rpc EndGame(EndGameRequest) returns (EndGameResponse);
+}
+
+message GetRoomInfoRequest {
+  string room_id = 1;
+}
+
+message GetRoomInfoResponse {
+  string room_id = 1;
+  repeated string user_ids = 2;
+  string status = 3;
+}
+
+message CreateRoomRequest {
+  string user_id = 1;
+}
+
+message CreateRoomResponse {
+  string room_id = 1;
+}
+
+message JoinRoomRequest {
+  string room_id = 1;
+  string user_id = 2;
+}
+
+message JoinRoomResponse {
+  bool result = 1;
+}
+
+message LeaveRoomRequest {
+  string room_id = 1;
+  string user_id = 2;
+}
+
+message LeaveRoomResponse {
+  bool result = 1;
+}
+
+message SetPreparationRequest {
+  string room_id = 1;
+  string user_id = 2;
+}
+
+message SetPreparationResponse {
+  bool result = 1;
+  bool status = 2; // true for prepared
+}
+
+message StartGameRequest {
+  string room_id = 1;
+  string user_id = 2;
+}
+
+message StartGameResponse {
+  bool result = 1;
+}
+
+message EndGameRequest {
+  string room_id = 1;
+}
+
+message EndGameResponse {
+  bool result = 1;
+}
