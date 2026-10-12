@@ -11,16 +11,20 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-func GetRoom(
+func GetRoomUsers(
 	client *redis.Client,
 	roomId string,
-) (userIds []string, err error) {
+) ([]string, error) {
 	room, err := operation.GetRoom(client, roomId)
 	if err != nil {
 		return nil, err
 	}
-	userIds = room.UserIDs
-	return userIds, nil
+
+	if room == nil {
+		return nil, nil
+	}
+
+	return room.UserIDs, nil
 }
 
 func CreateRoom(
