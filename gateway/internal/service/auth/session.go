@@ -15,7 +15,7 @@ func SessionCreation(
 ) (string, error) {
 
 	// Check if the session already exists
-	accountID = "session_account=" + accountID
+	accountID = "session_account:" + accountID
 	session, err := redisClient.Get(context.Background(), accountID).Result()
 	if err != redis.Nil && err != nil {
 		return "", err
@@ -31,7 +31,7 @@ func SessionCreation(
 	}
 
 	// add the pre to sessionID
-	sessionID = "session=" + sessionID
+	sessionID = "session:" + sessionID
 
 	// set the session ID and account ID in Redis with an expiration time of 7 days
 	err = redisClient.Set(
@@ -55,7 +55,7 @@ func SessionCreation(
 	if err != nil {
 		return "", err
 	}
-	sessionID = strings.TrimPrefix(sessionID, "session=")
+	sessionID = strings.TrimPrefix(sessionID, "session:")
 
 	return sessionID, nil
 }
@@ -65,13 +65,13 @@ func SessionAuthentication(
 	session string,
 ) (string, error) {
 
-	session = "session=" + session
+	session = "session:" + session
 
 	accountID, err := redisClient.Get(context.Background(), session).Result()
 	if err != nil && err != redis.Nil {
 		return "", err
 	}
-	accountID = strings.TrimPrefix(accountID, "session_account=")
+	accountID = strings.TrimPrefix(accountID, "session_account:")
 	return accountID, nil
 }
 
@@ -80,11 +80,11 @@ func GetUserIDFromSessionID(
 	ctx context.Context,
 	sessionID string,
 ) (string, error) {
-	sessionKey := "session=" + sessionID
+	sessionKey := "session:" + sessionID
 	accountID, err := redisClient.Get(ctx, sessionKey).Result()
 	if err != nil {
 		return "", err
 	}
-	accountID = strings.TrimPrefix(accountID, "session_account=")
+	accountID = strings.TrimPrefix(accountID, "session_account:")
 	return accountID, nil
 }
