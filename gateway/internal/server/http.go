@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"gateway/internal/client/room"
 	"gateway/internal/client/userdata"
 	"gateway/internal/router"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-func HttpServer(userDataClient *userdata.Client, redisClient *redis.Client) {
+func HttpServer(userDataClient *userdata.Client,
+	redisClient *redis.Client,
+	roomClient *room.Client) {
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
 		Addr:    "0.0.0.0:26526",
