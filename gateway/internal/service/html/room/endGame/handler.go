@@ -29,7 +29,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		switch req.Type {
 
-		case "setPreparation":
+		case "endGame":
 			var res bool
 			res, err = EndGame(roomClient, r.Context(), req.RoomID)
 
