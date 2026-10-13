@@ -6,7 +6,7 @@ services:
       - "26526:26526" 
     depends_on:
       # - game
-      # - room
+      - room
       - userdata
     networks:
       - game-net
@@ -22,6 +22,8 @@ services:
   room:
     build: ./room
     container_name: room
+    ports:
+      - "26528:26528"
     networks:
       - game-net
 
