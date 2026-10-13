@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gateway/internal/client/redis_client"
+	"gateway/internal/client/room"
 	"gateway/internal/client/userdata"
 	"gateway/internal/server"
 	"os"
@@ -34,9 +35,16 @@ func main() {
 		return
 	}
 	defer userDataClient.Close()
+	// create a new room client
+	roomClient, err := room.NewClient("room:9090")
+	if err != nil {
+		fmt.Println("Error creating room client:", err)
+		return
+	}
+	defer roomClient.Close()
 
 	// Start the HTTP server
-	server.HttpServer(userDataClient, redisClient)
+	server.HttpServer(userDataClient, redisClient, roomClient)
 
 	// Start the TCP server
 	server.TcpServer()
