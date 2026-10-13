@@ -3,9 +3,12 @@ set -u
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:26526}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-10}"
+REDIS_CONTAINER="${REDIS_CONTAINER:-redis}"
 USER_ID="curl_test_$(date +%s)_$$"
+SECOND_USER="${USER_ID}_second"
 PASSWORD="curl-test-password"
 SESSION_ID=""
+SECOND_SESSION_ID=""
 ROOM_ID=""
 PASSED=0
 FAILED=0
@@ -67,6 +70,27 @@ extract_json_value() {
   local key="$1"
   sed -nE "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\1/p" \
     "${TMP_DIR}/response" | head -n1
+}
+
+seed_lobby_status() {
+  if ! command -v docker >/dev/null 2>&1; then
+    printf 'FAIL %-30s docker command is required to seed Room test state\n' \
+      "seed second user status"
+    FAILED=$((FAILED + 1))
+    return
+  fi
+
+  if docker compose exec -T "$REDIS_CONTAINER" redis-cli \
+      SET "user_status:${SECOND_USER}" \
+      "{\"user_id\":\"${SECOND_USER}\",\"status\":\"in_lobby\"}" \
+      >/dev/null; then
+    printf 'PASS %-30s second user status seeded\n' "seed second user status"
+    PASSED=$((PASSED + 1))
+  else
+    printf 'FAIL %-30s unable to seed Redis lobby status\n' \
+      "seed second user status"
+    FAILED=$((FAILED + 1))
+  fi
 }
 
 echo "Testing ${BASE_URL}"
@@ -133,18 +157,27 @@ if [[ -n "$SESSION_ID" ]]; then
     PASSED=$((PASSED + 1))
   fi
 
+  request "POST /login register second user" POST "/login" 200 \
+    "{\"type\":\"register\",\"accountId\":\"${SECOND_USER}\",\"password\":\"${PASSWORD}\"}"
+  request "POST /login login second user" POST "/login" 200 \
+    "{\"type\":\"login\",\"accountId\":\"${SECOND_USER}\",\"password\":\"${PASSWORD}\"}"
+  SECOND_SESSION_ID="$(extract_json_value sessionId)"
+  seed_lobby_status
+
   request "POST /room/room getRoomInfo" POST "/room/room" 200 \
     "{\"type\":\"getRoomInfo\",\"sessionId\":\"${SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
   request "POST /room/room joinRoom" POST "/room/room" 200 \
-    "{\"type\":\"joinRoom\",\"sessionId\":\"${SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
+    "{\"type\":\"joinRoom\",\"sessionId\":\"${SECOND_SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
   request "POST /room/userPreparation setPreparation" POST "/room/userPreparation" 200 \
     "{\"type\":\"setPreparation\",\"sessionId\":\"${SESSION_ID}\",\"roomId\":\"${ROOM_ID}\",\"targetStatus\":true}"
+  request "POST /room/userPreparation second user ready" POST "/room/userPreparation" 200 \
+    "{\"type\":\"setPreparation\",\"sessionId\":\"${SECOND_SESSION_ID}\",\"roomId\":\"${ROOM_ID}\",\"targetStatus\":true}"
   request "POST /room/room startGame" POST "/room/room" 200 \
     "{\"type\":\"startGame\",\"sessionId\":\"${SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
-  request "POST /room/room leaveRoom" POST "/room/room" 200 \
-    "{\"type\":\"leaveRoom\",\"sessionId\":\"${SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
   request "POST /room/endGame endGame" POST "/room/endGame" 200 \
     "{\"type\":\"endGame\",\"roomId\":\"${ROOM_ID}\"}"
+  request "POST /room/room leaveRoom" POST "/room/room" 200 \
+    "{\"type\":\"leaveRoom\",\"sessionId\":\"${SECOND_SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
 else
   printf 'SKIP %-30s no valid session was created\n' "room flow"
   FAILED=$((FAILED + 1))

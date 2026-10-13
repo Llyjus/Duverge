@@ -9,8 +9,8 @@ import (
 func setPreparation(
 	roomClient *room.Client,
 	ctx context.Context,
-	userId string,
 	roomID string,
+	userId string,
 	targetStatus bool) (
 	bool,
 	error) {

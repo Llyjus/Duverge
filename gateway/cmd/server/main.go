@@ -36,7 +36,7 @@ func main() {
 	}
 	defer userDataClient.Close()
 	// create a new room client
-	roomClient, err := room.NewClient("room:9090")
+	roomClient, err := room.NewClient("room:26528")
 	if err != nil {
 		fmt.Println("Error creating room client:", err)
 		return
