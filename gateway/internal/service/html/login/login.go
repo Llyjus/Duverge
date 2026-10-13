@@ -30,6 +30,9 @@ func login(
 		return "", err
 	}
 	// Store the session ID in Redis
+	if res.SessionId == "" {
+		return "", err
+	}
 	sessionId, err := auth.SessionCreation(redisClient,
 		res.SessionId,
 		accountId)
