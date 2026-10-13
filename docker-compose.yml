@@ -19,11 +19,11 @@ services:
   #   networks:
   #     - game-net
 
-  # room:
-  #   build: ./room
-  #   container_name: room
-  #   networks:
-  #     - game-net
+  room:
+    build: ./room
+    container_name: room
+    networks:
+      - game-net
 
   userdata:
     build:
