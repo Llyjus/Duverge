@@ -16,7 +16,7 @@ func HttpServer(userDataClient *userdata.Client,
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
 		Addr:    "0.0.0.0:26526",
-		Handler: router.NewHTTPRouter(userDataClient, redisClient),
+		Handler: router.NewHTTPRouter(userDataClient, redisClient, roomClient),
 	}
 
 	go func() {
