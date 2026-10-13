@@ -72,23 +72,26 @@ extract_json_value() {
     "${TMP_DIR}/response" | head -n1
 }
 
-seed_lobby_status() {
+seed_user_status() {
+  local user_id="$1"
+  local status="$2"
+
   if ! command -v docker >/dev/null 2>&1; then
     printf 'FAIL %-30s docker command is required to seed Room test state\n' \
-      "seed second user status"
+      "seed ${user_id} status"
     FAILED=$((FAILED + 1))
     return
   fi
 
   if docker compose exec -T "$REDIS_CONTAINER" redis-cli \
-      SET "user_status:${SECOND_USER}" \
-      "{\"user_id\":\"${SECOND_USER}\",\"status\":\"in_lobby\"}" \
+      SET "user_status:${user_id}" \
+      "{\"user_id\":\"${user_id}\",\"status\":\"${status}\"}" \
       >/dev/null; then
-    printf 'PASS %-30s second user status seeded\n' "seed second user status"
+    printf 'PASS %-30s user status seeded\n' "seed ${user_id} status"
     PASSED=$((PASSED + 1))
   else
-    printf 'FAIL %-30s unable to seed Redis lobby status\n' \
-      "seed second user status"
+    printf 'FAIL %-30s unable to seed Redis user status\n' \
+      "seed ${user_id} status"
     FAILED=$((FAILED + 1))
   fi
 }
@@ -156,13 +159,14 @@ if [[ -n "$SESSION_ID" ]]; then
     printf 'PASS %-30s roomId received\n' "extract roomId"
     PASSED=$((PASSED + 1))
   fi
+  seed_user_status "$USER_ID" "in_room"
 
   request "POST /login register second user" POST "/login" 200 \
     "{\"type\":\"register\",\"accountId\":\"${SECOND_USER}\",\"password\":\"${PASSWORD}\"}"
   request "POST /login login second user" POST "/login" 200 \
     "{\"type\":\"login\",\"accountId\":\"${SECOND_USER}\",\"password\":\"${PASSWORD}\"}"
   SECOND_SESSION_ID="$(extract_json_value sessionId)"
-  seed_lobby_status
+  seed_user_status "$SECOND_USER" "in_lobby"
 
   request "POST /room/room getRoomInfo" POST "/room/room" 200 \
     "{\"type\":\"getRoomInfo\",\"sessionId\":\"${SESSION_ID}\",\"roomId\":\"${ROOM_ID}\"}"
