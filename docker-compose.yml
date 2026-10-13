@@ -26,6 +26,10 @@ services:
       - "26528:26528"
     networks:
       - game-net
+    environment:
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      - redis
 
   userdata:
     build:
