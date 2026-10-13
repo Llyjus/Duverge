@@ -41,7 +41,8 @@ message JoinRoomResponse {
 }
 
 message LeaveRoomRequest {
-  bool result = 1;
+  string room_id = 1;
+  string user_id = 2;
 }
 
 message LeaveRoomResponse {
