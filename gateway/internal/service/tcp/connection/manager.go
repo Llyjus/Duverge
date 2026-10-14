@@ -19,7 +19,7 @@ func (cm *ConnectionManager) Add(session *Session) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	cm.sessions[session.ID] = session
+	cm.sessions[session.UserID] = session
 }
 
 func (cm *ConnectionManager) Remove(id string, expected *Session) {

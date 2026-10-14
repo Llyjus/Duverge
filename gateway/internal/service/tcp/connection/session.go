@@ -6,7 +6,6 @@ import (
 )
 
 type Session struct {
-	ID         string
 	Conn       net.Conn
 	UserID     string
 	AuthStatus bool
@@ -14,10 +13,10 @@ type Session struct {
 	closeOnce sync.Once
 }
 
-func NewSession(id string, conn net.Conn) *Session {
+func NewSession(conn net.Conn) *Session {
 	return &Session{
-		ID:   id,
-		Conn: conn,
+		Conn:       conn,
+		AuthStatus: false,
 	}
 }
 
