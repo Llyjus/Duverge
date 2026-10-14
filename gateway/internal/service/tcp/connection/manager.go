@@ -1,44 +1,44 @@
 package connection
 
 import (
-	"net"
 	"sync"
 )
 
 type ConnectionManager struct {
-	mu    sync.RWMutex
-	conns map[string]net.Conn
+	mu       sync.RWMutex
+	sessions map[string]*Session
 }
 
 func NewConnectionManager() *ConnectionManager {
 	return &ConnectionManager{
-		conns: make(map[string]net.Conn),
+		sessions: make(map[string]*Session),
 	}
 }
 
-func (cm *ConnectionManager) Add(id string, conn net.Conn) {
+func (cm *ConnectionManager) Add(session *Session) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	cm.conns[id] = conn
+
+	cm.sessions[session.ID] = session
 }
 
-func (cm *ConnectionManager) Remove(id string, expected net.Conn) {
+func (cm *ConnectionManager) Remove(id string, expected *Session) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	// Check if the connection exists and matches the expected connection
 	// If it doesn't match( maybe new connection ), we don't remove it
-	conn, ok := cm.conns[id]
-	if !ok || conn != expected {
+	session, ok := cm.sessions[id]
+	if !ok || session != expected {
 		return
 	}
 
-	delete(cm.conns, id)
-	conn.Close()
+	delete(cm.sessions, id)
+	session.Close()
 }
-func (cm *ConnectionManager) Get(id string) (net.Conn, bool) {
+func (cm *ConnectionManager) Get(id string) (*Session, bool) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	conn, ok := cm.conns[id]
-	return conn, ok
+	session, ok := cm.sessions[id]
+	return session, ok
 }
