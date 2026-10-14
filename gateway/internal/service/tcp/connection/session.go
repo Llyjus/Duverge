@@ -6,8 +6,10 @@ import (
 )
 
 type Session struct {
-	ID   string
-	Conn net.Conn
+	ID         string
+	Conn       net.Conn
+	UserID     string
+	AuthStatus bool
 
 	closeOnce sync.Once
 }
