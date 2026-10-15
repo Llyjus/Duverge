@@ -4,6 +4,7 @@ services:
     container_name: gateway
     ports:
       - "26526:26526" 
+      - "26527:26527"
     depends_on:
       # - game
       - room
