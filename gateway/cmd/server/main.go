@@ -7,6 +7,7 @@ import (
 	"gateway/internal/client/room"
 	"gateway/internal/client/userdata"
 	"gateway/internal/server"
+	"gateway/internal/service/tcp/connection"
 	"os"
 	"os/signal"
 	"syscall"
@@ -45,9 +46,10 @@ func main() {
 
 	// Start the HTTP server
 	server.HttpServer(userDataClient, redisClient, roomClient)
+	manager := connection.NewConnectionManager()
 
 	// Start the TCP server
-	server.TcpServer()
+	server.TcpServer(manager, redisClient)
 
 	<-quit
 	fmt.Println("Shutting down server...")
