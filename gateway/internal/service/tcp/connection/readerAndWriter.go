@@ -13,7 +13,7 @@ import (
 
 const MaxMessageSize = 64 * 1024
 
-func Decode(conn net.Conn) ([]byte, error) {
+func ReadMessage(conn net.Conn) ([]byte, error) {
 	var header [4]byte
 
 	// read the 4-byte header
