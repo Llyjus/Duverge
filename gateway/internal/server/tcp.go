@@ -2,28 +2,39 @@ package server
 
 import (
 	"fmt"
-	"gateway/internal/service/tcp/game"
 	"net"
+
+	"github.com/redis/go-redis/v9"
+
+	connection "gateway/internal/service/tcp/connection"
+	"gateway/internal/service/tcp/handler"
 )
 
-func TcpServer() {
-	// TCP server
+func TcpServer(
+	manager *connection.ConnectionManager,
+	redisClient *redis.Client,
+) {
 	tcpListener, err := net.Listen("tcp", ":26527")
 	if err != nil {
 		panic(err)
 	}
+	defer tcpListener.Close()
 
-	fmt.Println("[TCP] game server is running...")
+	fmt.Println("[TCP] tcp server is running...")
 
-	go func() {
-		for {
-			conn, err := tcpListener.Accept()
-			if err != nil {
-				fmt.Printf("[TCP] error accepting connection: %v\n", err)
-				return
-			}
-			// for every new connection, handle it in a separate goroutine
-			go game.HandleGame(conn)
+	for {
+		conn, err := tcpListener.Accept()
+		if err != nil {
+			fmt.Printf("[TCP] error accepting connection: %v\n", err)
+			continue
 		}
-	}()
+
+		session := connection.NewSession(conn)
+
+		go handler.HandleConnection(
+			session,
+			manager,
+			redisClient,
+		)
+	}
 }
