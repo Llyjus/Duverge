@@ -36,3 +36,34 @@ func ReadMessage(conn net.Conn) ([]byte, error) {
 
 	return body, nil
 }
+
+func WriteMessage(conn net.Conn, body []byte) error {
+	length := len(body)
+
+	if length == 0 || length > MaxMessageSize {
+		return fmt.Errorf("invalid message length: %d", length)
+	}
+
+	// create the 4-byte length header
+	var header [4]byte
+	binary.BigEndian.PutUint32(header[:], uint32(length))
+
+	// combine the header and message body
+	frame := make([]byte, 4+length)
+	copy(frame[:4], header[:])
+	copy(frame[4:], body)
+
+	// write the complete message
+	for len(frame) > 0 {
+		n, err := conn.Write(frame)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		frame = frame[n:]
+	}
+
+	return nil
+}
