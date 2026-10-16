@@ -10,7 +10,10 @@ type Session struct {
 	UserID     string
 	AuthStatus bool
 
-	closeOnce sync.Once
+	// Add a mutex to prevent concurrent writes to the connection
+	// and ensure thread safety.
+	writeMutex sync.Mutex
+	closeOnce  sync.Once
 }
 
 func NewSession(conn net.Conn) *Session {
