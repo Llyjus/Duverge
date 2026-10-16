@@ -6,6 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	auth "gateway/internal/service/tcp/auth"
 	connection "gateway/internal/service/tcp/connection"
 )
 
@@ -43,7 +44,7 @@ func HandleConnection(
 				return
 			}
 
-			if err := authenticate(
+			if err := auth.Authenticate(
 				session,
 				manager,
 				redisClient,

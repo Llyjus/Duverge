@@ -10,8 +10,3 @@ type Message struct {
 	Type    string          `json:"type"`
 	Data    json.RawMessage `json:"data"`
 }
-
-type AuthMessage struct {
-	Type         string `json:"type"`
-	LoginSession string `json:"token"`
-}
