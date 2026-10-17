@@ -36,7 +36,7 @@ func CapsulateErrorResponse(
 	return responseData, nil
 }
 
-func CapsulateSuccessResponse() (
+func CapsulateSuccessResponse(requestID string) (
 	[]byte,
 	error) {
 	// capsulate the success response
