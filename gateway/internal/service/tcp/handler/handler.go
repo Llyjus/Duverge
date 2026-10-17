@@ -75,6 +75,18 @@ func HandleConnection(
 				return
 			}
 
+			// send a success response back to the sender
+			responseData, err := protocol.CapsulateSuccessResponse()
+			if err != nil {
+				log.Printf("[TCP] failed to send chat response: %v\n", err)
+				return
+			}
+
+			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+				log.Printf("[TCP] failed to send chat response: %v\n", writeErr)
+				return
+			}
+
 			defer manager.Remove(session.UserID, session)
 
 			continue
