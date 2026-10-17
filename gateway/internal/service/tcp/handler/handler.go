@@ -32,7 +32,7 @@ func HandleConnection(
 			// Send a message to the client
 			closeMessage, err := protocol.CapsulateErrorResponse(
 				protocol.ErrCodeInternal,
-				"服务器链接错误，请稍后重试",
+				"服务器连接错误，请稍后重试",
 			)
 			if err != nil {
 				log.Printf("[TCP] failed to capsulate close message: %v\n", err)
