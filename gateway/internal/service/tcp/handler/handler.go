@@ -71,6 +71,18 @@ func HandleConnection(
 		switch msg.Type {
 		case "auth":
 			fmt.Println("[TCP] connection is already authenticated")
+			errorResponseData, err := protocol.CapsulateErrorResponse(
+				protocol.ErrCodeForbidden,
+				"禁止的操作",
+			)
+			if err != nil {
+				fmt.Printf("[TCP] failed to capsulate auth error response: %v\n", err)
+				return
+			}
+			if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+				fmt.Printf("[TCP] failed to send auth error response: %v\n", writeErr)
+				return
+			}
 
 		case "chat":
 			err := chat.HandleChat(
@@ -125,6 +137,18 @@ func HandleConnection(
 
 		default:
 			fmt.Printf("[TCP] unsupported message type: %v\n", msg.Type)
+			errorResponseData, err := protocol.CapsulateErrorResponse(
+				protocol.ErrCodeInvalidMessage,
+				"不支持的消息类型",
+			)
+			if err != nil {
+				fmt.Printf("[TCP] failed to capsulate type error response: %v\n", err)
+				return
+			}
+			if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+				fmt.Printf("[TCP] failed to send type error response: %v\n", writeErr)
+				return
+			}
 
 		}
 	}

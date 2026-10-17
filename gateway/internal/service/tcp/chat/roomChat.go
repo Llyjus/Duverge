@@ -2,6 +2,8 @@ package chat
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/redis/go-redis/v9"
 
@@ -29,6 +31,9 @@ func roomChat(
 		roomID,
 		ctx)
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return fmt.Errorf("room %s: %w", roomID, protocol.ErrNotFound)
+		}
 		return err
 	}
 

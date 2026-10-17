@@ -21,7 +21,7 @@ func privateChat(
 ) error {
 	session, ok := manager.Get(targetUserID)
 	if !ok {
-		return fmt.Errorf("session not found for user: %s", protocol.ErrNotFound)
+		return fmt.Errorf("session not found for user: %w", protocol.ErrNotFound)
 	}
 
 	messageID := uuid.NewString()
