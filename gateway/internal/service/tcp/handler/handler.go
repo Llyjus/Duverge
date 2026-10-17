@@ -136,12 +136,12 @@ func HandleConnection(
 			// send a success response back to the sender
 			responseData, err := protocol.CapsulateSuccessResponse()
 			if err != nil {
-				fmt.Printf("[TCP] failed to send chat response: %v\n", err)
+				log.Printf("[TCP] failed to send chat response: %v\n", err)
 				return
 			}
 
 			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
-				fmt.Printf("[TCP] failed to send chat response: %v\n", writeErr)
+				log.Printf("[TCP] failed to send chat response: %v\n", writeErr)
 				return
 			}
 
