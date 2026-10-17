@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -14,20 +15,21 @@ func Authenticate(
 	session *connection.Session,
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
+	ctx context.Context,
 	data json.RawMessage,
 ) error {
-	// Decode authentication data.
+	// Decode authentication data
 	var authMsg AuthMessage
 	if err := json.Unmarshal(data, &authMsg); err != nil {
 		return fmt.Errorf("invalid auth message: %w", err)
 	}
 
-	// Check login session.
+	// Check login session
 	if authMsg.LoginSession == "" {
 		return fmt.Errorf("missing login session")
 	}
 
-	// Authenticate the login session.
+	// Authenticate the login session
 	userID, err := auth.SessionAuthentication(
 		redisClient,
 		authMsg.LoginSession,
@@ -40,12 +42,21 @@ func Authenticate(
 		return fmt.Errorf("authentication returned empty user ID")
 	}
 
-	// Mark the connection as authenticated.
+	// Mark the connection as authenticated
 	session.UserID = userID
 	session.AuthStatus = true
 
-	// Register the authenticated session.
+	// Register the authenticated session
 	manager.Add(session)
+
+	// Create user status in Redis
+	if err := auth.UserStatusCreation(
+		redisClient,
+		ctx,
+		userID,
+	); err != nil {
+		return fmt.Errorf("failed to create user status: %w", err)
+	}
 
 	return nil
 }
