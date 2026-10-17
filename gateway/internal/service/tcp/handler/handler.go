@@ -49,19 +49,55 @@ func HandleConnection(
 		var msg protocol.Message
 		if err := json.Unmarshal(body, &msg); err != nil {
 			log.Printf("[TCP] invalid message: %v\n", err)
-			return
+
+			responseData, err := protocol.CapsulateErrorResponse(
+				protocol.ErrCodeInvalidMessage,
+				"非法消息格式",
+			)
+			if err != nil {
+				log.Printf("[TCP] failed to capsulate invalid message response: %v\n", err)
+				return
+			}
+			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+				log.Printf("[TCP] failed to send invalid message response: %v\n", writeErr)
+				return
+			}
+			continue
 		}
 
 		if msg.Version != protocol.Version {
 			log.Printf("[TCP] unsupported message version: %v\n", msg.Version)
+
+			responseData, err := protocol.CapsulateErrorResponse(
+				protocol.ErrCodeVersionMismatch,
+				"不支持的消息版本",
+			)
+			if err != nil {
+				log.Printf("[TCP] failed to capsulate version mismatch response: %v\n", err)
+				return
+			}
+			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+				log.Printf("[TCP] failed to send version mismatch response: %v\n", writeErr)
+			}
 			return
 		}
 
 		// check authentication status
 		if !session.AuthStatus {
 			if msg.Type != "auth" {
-				log.Println("[TCP] authentication required")
-				return
+				ErrorResponseData, err := protocol.CapsulateErrorResponse(
+					protocol.ErrCodeUnauthenticated,
+					"请先进行身份验证",
+				)
+				if err != nil {
+					log.Printf("[TCP] failed to capsulate unauthenticated error response: %v\n", err)
+					return
+				}
+				if writeErr := connection.WriteMessage(session.Conn, ErrorResponseData); writeErr != nil {
+					log.Printf("[TCP] failed to send unauthenticated error response: %v\n", writeErr)
+					return
+				}
+				continue
 			}
 
 			if err := auth.Authenticate(
@@ -98,7 +134,7 @@ func HandleConnection(
 			log.Println("[TCP] connection is already authenticated")
 			errorResponseData, err := protocol.CapsulateErrorResponse(
 				protocol.ErrCodeForbidden,
-				"禁止的操作",
+				"连接已认证，禁止重复认证",
 			)
 			if err != nil {
 				log.Printf("[TCP] failed to capsulate auth error response: %v\n", err)
@@ -170,12 +206,9 @@ func HandleConnection(
 			if err != nil {
 				log.Printf("[TCP] failed to handle heartbeat message: %v\n", err)
 
-				// classify the error and capsulate the error response
-				errorCode, detail := mapChatError(err)
-
 				errorResponseData, err := protocol.CapsulateErrorResponse(
-					errorCode,
-					detail,
+					protocol.ErrCodeInternal,
+					"内部服务器错误",
 				)
 				if err != nil {
 					log.Printf("[TCP] failed to capsulate error response: %v\n", err)
