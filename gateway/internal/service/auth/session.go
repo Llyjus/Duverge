@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -87,4 +88,25 @@ func GetUserIDFromSessionID(
 	}
 	accountID = strings.TrimPrefix(accountID, "session_account:")
 	return accountID, nil
+}
+
+func GetUserIDsFromRoomID(
+	redisClient *redis.Client,
+	ctx context.Context,
+	roomID string,
+) ([]string, error) {
+	roomKey := "room:" + roomID
+	roomJSON, err := redisClient.Get(ctx, roomKey).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var room struct {
+		UserIDs []string `json:"userIds"`
+	}
+	if err := json.Unmarshal([]byte(roomJSON), &room); err != nil {
+		return nil, err
+	}
+
+	return room.UserIDs, nil
 }
