@@ -9,6 +9,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
+// session creation and authentication functions
 func SessionCreation(
 	redisClient *redis.Client,
 	sessionID string,
@@ -90,6 +91,7 @@ func GetUserIDFromSessionID(
 	return accountID, nil
 }
 
+// get user IDs from room ID for chat message broadcasting
 func GetUserIDsFromRoomID(
 	redisClient *redis.Client,
 	ctx context.Context,
@@ -109,4 +111,14 @@ func GetUserIDsFromRoomID(
 	}
 
 	return room.UserIDs, nil
+}
+
+// Create user status after successful authentication
+func UserStatusCreation(
+	redisClient *redis.Client,
+	ctx context.Context,
+	userID string,
+) error {
+	statusKey := "user_status:" + userID
+	return redisClient.Set(ctx, statusKey, "in_lobby", 30*time.Second).Err()
 }
