@@ -7,4 +7,5 @@ const (
 	ErrCodeNotFound        = "NOT_FOUND"
 	ErrCodeInternal        = "INTERNAL_ERROR"
 	ErrCodeServerErr       = "SERVER_ERROR"
+	ErrCodeServerClosedErr = "SERVER_CLOSED_ERROR"
 )
