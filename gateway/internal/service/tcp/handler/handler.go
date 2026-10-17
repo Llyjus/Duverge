@@ -76,7 +76,7 @@ func HandleConnection(
 			}
 
 			// send a success response back to the sender
-			responseData, err := protocol.CapsulateSuccessResponse()
+			responseData, err := protocol.CapsulateSuccessResponse(msg.RequestID)
 			if err != nil {
 				log.Printf("[TCP] failed to send chat response: %v\n", err)
 				return
@@ -146,7 +146,7 @@ func HandleConnection(
 			}
 
 			// send a success response back to the sender
-			responseData, err := protocol.CapsulateSuccessResponse()
+			responseData, err := protocol.CapsulateSuccessResponse(msg.RequestID)
 			if err != nil {
 				log.Printf("[TCP] failed to send chat response: %v\n", err)
 				return
@@ -192,7 +192,7 @@ func HandleConnection(
 			}
 
 			// send a success response back to the sender
-			responseData, err := protocol.CapsulateSuccessResponse()
+			responseData, err := protocol.CapsulateSuccessResponse(msg.RequestID)
 			if err != nil {
 				log.Printf("[TCP] failed to send heartbeat response: %v\n", err)
 				return
