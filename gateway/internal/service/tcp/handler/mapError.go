@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"io"
 
 	"gateway/internal/service/tcp/protocol"
 )
@@ -23,4 +24,27 @@ func mapChatError(err error) (string, string) {
 	default:
 		return protocol.ErrCodeInternal, "内部服务器错误"
 	}
+}
+
+func mapAuthError(err error) (string, string) {
+	switch {
+	case errors.Is(err, protocol.ErrInvalidMessage):
+		return protocol.ErrCodeInvalidMessage, "非法认证信息"
+
+	case errors.Is(err, protocol.ErrAuthenticationFailed):
+		return protocol.ErrCodeAuthentication, "身份验证失败"
+
+	case errors.Is(err, protocol.ErrInternal):
+		return protocol.ErrCodeInternal, "内部服务器错误"
+
+	default:
+		return protocol.ErrCodeInternal, "内部服务器错误"
+	}
+}
+
+func mapConnectionError(err error) (string, string) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return protocol.ErrCodeServerClosed, "连接已关闭"
+	}
+	return protocol.ErrCodeInternal, "服务器连接错误，请稍后重试"
 }

@@ -29,10 +29,10 @@ func HandleConnection(
 		if err != nil {
 			log.Printf("[TCP] failed to read message: %v\n", err)
 
-			// Send a message to the client
+			errorCode, detail := mapConnectionError(err)
 			closeMessage, err := protocol.CapsulateErrorResponse(
-				protocol.ErrCodeInternal,
-				"服务器连接错误，请稍后重试",
+				errorCode,
+				detail,
 			)
 			if err != nil {
 				log.Printf("[TCP] failed to capsulate close message: %v\n", err)
@@ -108,6 +108,18 @@ func HandleConnection(
 				msg.Data,
 			); err != nil {
 				log.Printf("[TCP] authentication failed: %v\n", err)
+				errorCode, detail := mapAuthError(err)
+				errorResponseData, responseErr := protocol.CapsulateErrorResponse(
+					errorCode,
+					detail,
+				)
+				if responseErr != nil {
+					log.Printf("[TCP] failed to capsulate authentication error response: %v\n", responseErr)
+					return
+				}
+				if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+					log.Printf("[TCP] failed to send authentication error response: %v\n", writeErr)
+				}
 				return
 			}
 

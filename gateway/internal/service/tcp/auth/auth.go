@@ -9,6 +9,7 @@ import (
 
 	"gateway/internal/service/auth"
 	connection "gateway/internal/service/tcp/connection"
+	protocol "gateway/internal/service/tcp/protocol"
 )
 
 func Authenticate(
@@ -21,12 +22,12 @@ func Authenticate(
 	// Decode authentication data
 	var authMsg AuthMessage
 	if err := json.Unmarshal(data, &authMsg); err != nil {
-		return fmt.Errorf("invalid auth message: %w", err)
+		return fmt.Errorf("%w: %v", protocol.ErrInvalidMessage, err)
 	}
 
 	// Check login session
 	if authMsg.LoginSession == "" {
-		return fmt.Errorf("missing login session")
+		return fmt.Errorf("%w: missing login session", protocol.ErrInvalidMessage)
 	}
 
 	// Authenticate the login session
@@ -35,11 +36,11 @@ func Authenticate(
 		authMsg.LoginSession,
 	)
 	if err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		return fmt.Errorf("%w: %v", protocol.ErrAuthenticationFailed, err)
 	}
 
 	if userID == "" {
-		return fmt.Errorf("authentication returned empty user ID")
+		return fmt.Errorf("%w: empty user ID", protocol.ErrAuthenticationFailed)
 	}
 
 	// Mark the connection as authenticated
@@ -55,7 +56,7 @@ func Authenticate(
 		ctx,
 		userID,
 	); err != nil {
-		return fmt.Errorf("failed to create user status: %w", err)
+		return fmt.Errorf("%w: failed to create user status: %v", protocol.ErrInternal, err)
 	}
 
 	return nil
