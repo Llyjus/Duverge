@@ -1,14 +1,17 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/redis/go-redis/v9"
 
 	auth "gateway/internal/service/tcp/auth"
 	chat "gateway/internal/service/tcp/chat"
 	connection "gateway/internal/service/tcp/connection"
+	heartbeat "gateway/internal/service/tcp/heartbeat"
 	protocol "gateway/internal/service/tcp/protocol"
 )
 
@@ -17,18 +20,27 @@ func HandleConnection(
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
 ) {
+	ctx := context.Background()
 	defer session.Close()
 
 	for {
 		// read the first message from the connection
 		body, err := connection.ReadMessage(session.Conn)
 		if err != nil {
-			fmt.Printf("[TCP] failed to read message: %v\n", err)
+			log.Printf("[TCP] failed to read message: %v\n", err)
 
 			// Send a message to the client
-			closeMessage := []byte("Connection closed by server")
+			closeMessage, err := protocol.CapsulateErrorResponse(
+				protocol.ErrCodeServerClosedErr,
+				"服务器关闭连接",
+			)
+			if err != nil {
+				log.Printf("[TCP] failed to capsulate close message: %v\n", err)
+				return
+			}
+
 			if writeErr := connection.WriteMessage(session.Conn, closeMessage); writeErr != nil {
-				fmt.Printf("[TCP] failed to send close message: %v\n", writeErr)
+				log.Printf("[TCP] failed to send close message: %v\n", writeErr)
 			}
 			return
 		}
@@ -36,19 +48,19 @@ func HandleConnection(
 		// decode the message
 		var msg protocol.Message
 		if err := json.Unmarshal(body, &msg); err != nil {
-			fmt.Printf("[TCP] invalid message: %v\n", err)
+			log.Printf("[TCP] invalid message: %v\n", err)
 			return
 		}
 
 		if msg.Version != protocol.Version {
-			fmt.Printf("[TCP] unsupported message version: %v\n", msg.Version)
+			log.Printf("[TCP] unsupported message version: %v\n", msg.Version)
 			return
 		}
 
 		// check authentication status
 		if !session.AuthStatus {
 			if msg.Type != "auth" {
-				fmt.Println("[TCP] authentication required")
+				log.Println("[TCP] authentication required")
 				return
 			}
 
@@ -56,9 +68,10 @@ func HandleConnection(
 				session,
 				manager,
 				redisClient,
+				ctx,
 				msg.Data,
 			); err != nil {
-				fmt.Printf("[TCP] authentication failed: %v\n", err)
+				log.Printf("[TCP] authentication failed: %v\n", err)
 				return
 			}
 
@@ -70,21 +83,24 @@ func HandleConnection(
 		// classify the message
 		switch msg.Type {
 		case "auth":
-			fmt.Println("[TCP] connection is already authenticated")
+			log.Println("[TCP] connection is already authenticated")
 			errorResponseData, err := protocol.CapsulateErrorResponse(
 				protocol.ErrCodeForbidden,
 				"禁止的操作",
 			)
 			if err != nil {
-				fmt.Printf("[TCP] failed to capsulate auth error response: %v\n", err)
+				log.Printf("[TCP] failed to capsulate auth error response: %v\n", err)
 				return
 			}
 			if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
-				fmt.Printf("[TCP] failed to send auth error response: %v\n", writeErr)
+				log.Printf("[TCP] failed to send auth error response: %v\n", writeErr)
 				return
 			}
 
 		case "chat":
+
+			log.Printf("[TCP] received chat message from %s\n", session.UserID)
+
 			err := chat.HandleChat(
 				session.UserID,
 				manager,
@@ -94,7 +110,7 @@ func HandleConnection(
 
 			// error handling for chat message
 			if err != nil {
-				fmt.Printf("[TCP] failed to handle chat message: %v\n", err)
+				log.Printf("[TCP] failed to handle chat message: %v\n", err)
 
 				// classify the error and capsulate the error response
 				errorCode, detail := mapChatError(err)
@@ -129,24 +145,68 @@ func HandleConnection(
 				return
 			}
 
-			fmt.Printf("[TCP] received chat message from %s\n", session.UserID)
+		case "heartbeat":
+
+			log.Printf("[TCP] received heartbeat from %s\n", session.UserID)
+
+			err := heartbeat.HandleHeartbeat(
+				session,
+				redisClient,
+				ctx,
+			)
+			// error handling for heartbeat message
+			if err != nil {
+				log.Printf("[TCP] failed to handle heartbeat message: %v\n", err)
+
+				// classify the error and capsulate the error response
+				errorCode, detail := mapChatError(err)
+
+				errorResponseData, err := protocol.CapsulateErrorResponse(
+					errorCode,
+					detail,
+				)
+				if err != nil {
+					log.Printf("[TCP] failed to capsulate error response: %v\n", err)
+					return
+				}
+
+				if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+					log.Printf("[TCP] failed to send error response: %v\n", writeErr)
+					return
+				}
+
+				//continue to next message
+				continue
+			}
+
+			// send a success response back to the sender
+			responseData, err := protocol.CapsulateSuccessResponse()
+			if err != nil {
+				log.Printf("[TCP] failed to send heartbeat response: %v\n", err)
+				return
+			}
+
+			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+				log.Printf("[TCP] failed to send heartbeat response: %v\n", writeErr)
+				return
+			}
 
 		case "game":
 			// TODO: handle the game message
-			fmt.Printf("[TCP] received game message from %s\n", session.UserID)
+			log.Printf("[TCP] received game message from %s\n", session.UserID)
 
 		default:
-			fmt.Printf("[TCP] unsupported message type: %v\n", msg.Type)
+			log.Printf("[TCP] unsupported message type: %v\n", msg.Type)
 			errorResponseData, err := protocol.CapsulateErrorResponse(
 				protocol.ErrCodeInvalidMessage,
 				"不支持的消息类型",
 			)
 			if err != nil {
-				fmt.Printf("[TCP] failed to capsulate type error response: %v\n", err)
+				log.Printf("[TCP] failed to capsulate type error response: %v\n", err)
 				return
 			}
 			if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
-				fmt.Printf("[TCP] failed to send type error response: %v\n", writeErr)
+				log.Printf("[TCP] failed to send type error response: %v\n", writeErr)
 				return
 			}
 
