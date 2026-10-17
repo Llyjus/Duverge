@@ -29,7 +29,7 @@ func HandleHeartbeat(
 		return fmt.Errorf(
 			"failed to renew user status for user %s: %w",
 			session.UserID,
-			protocol.ServerErr,
+			protocol.ErrInternal,
 		)
 	}
 	return nil

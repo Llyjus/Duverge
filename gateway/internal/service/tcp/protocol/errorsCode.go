@@ -6,6 +6,5 @@ const (
 	ErrCodeForbidden       = "FORBIDDEN"
 	ErrCodeNotFound        = "NOT_FOUND"
 	ErrCodeInternal        = "INTERNAL_ERROR"
-	ErrCodeServerErr       = "SERVER_ERROR"
-	ErrCodeServerClosedErr = "SERVER_CLOSED_ERROR"
+	ErrCodeServerClosed    = "SERVER_CLOSED_ERROR"
 )

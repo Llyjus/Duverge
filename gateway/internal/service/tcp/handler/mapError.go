@@ -17,8 +17,8 @@ func mapChatError(err error) (string, string) {
 	case errors.Is(err, protocol.ErrNotFound):
 		return protocol.ErrCodeNotFound, "资源未找到"
 
-	case errors.Is(err, protocol.ServerErr):
-		return protocol.ErrCodeServerErr, "服务器错误"
+	case errors.Is(err, protocol.ErrServerClosed):
+		return protocol.ErrCodeServerClosed, "服务器已关闭"
 
 	default:
 		return protocol.ErrCodeInternal, "内部服务器错误"
