@@ -2,370 +2,456 @@
 
 [English](README.md) | [中文](README_ch.md)
 
-Duverge is a game-like backend project designed with a modular, service-oriented architecture.
+Duverge is an experimental multiplayer-game backend. It is split into a Gateway, Room, and UserData service and currently implements user registration/login, session management, room membership, ready state, game state transitions, TCP heartbeats, and room/private chat.
 
-The project is currently under active development and consists of several backend services communicating through HTTP, TCP, and gRPC.
+> The repository is under active development. The API and storage contracts below describe the current implementation, not a stable production API.
 
 ## Architecture
 
-### Overview
+```text
+Client
+  ├── HTTP :26526 ───────┐
+  └── TCP  :26527         │
+                         ▼
+                    Gateway (Go)
+                  ┌──────┴──────┐
+                  │             │
+          gRPC :9090      gRPC :26528
+                  │             │
+              UserData       Room (Go)
+                  │             │
+                MySQL ◄──── Redis :6379
+```
 
-The architecture is divided into four main services:
+| Service | Stack | Container port | Responsibility |
+|---|---|---:|---|
+| `gateway` | Go 1.26 | `26526` HTTP, `26527` TCP | External entry point, sessions, TCP auth, heartbeat, chat, room HTTP API |
+| `userdata` | Java 21 / Spring Boot | `9090` gRPC | User registration, BCrypt password verification, login-session generation |
+| `room` | Go 1.26 | `26528` gRPC | Rooms, membership, ready state, game state |
+| `redis` | Redis | `6379` | Sessions, user status, rooms |
+| `mysql` | MySQL 8.4 | `3306` | User persistence |
+| `adminer` | Adminer | `8080` | Development database UI |
+| `redisinsight` | RedisInsight | `5540` | Development Redis UI |
+| `game` | Not enabled | - | Compose entry is commented out; TCP `game` messages are currently a placeholder |
 
-* Gateway
-* UserData
-* Room
-* Game
+Inside the Compose network, services use:
 
-This project adopts a microservices architecture, with Docker Compose used to manage and deploy the services. The main purpose is to explore how independent services communicate with each other and how communication failures between containers can be handled.
+```text
+redis:6379
+userdata:9090
+room:26528
+mysql:3306
+```
 
-### Communication
+For the complete field-level API, Redis, and MySQL data dictionary, see the [Chinese API reference](README_ch.md).
 
-Requests from clients, including both HTTP and TCP connections, are received by the Gateway. The Gateway then routes requests according to their connection type and purpose.
-
-The backend services communicate with each other using gRPC.
-
-### Languages Chosen
-
-The Gateway and Room services are implemented in **Go**, mainly because Go provides lightweight goroutines and efficient concurrency support, which makes it suitable for handling a large number of concurrent connections.
-
-The UserData service is implemented using **Java and Spring Boot**, mainly because of its mature support for CRUD operations, database connectivity, and data persistence through technologies such as Spring Data JPA.
-
-
-## Technology Stack
-
-* **Go**
-* **Java**
-* **Spring Boot**
-* **gRPC / Protocol Buffers**
-* **MySQL**
-* **Docker Compose**
-* **Maven**
-* **Git**
-
-## Project Structure
-
-Current:
+## Repository layout
 
 ```text
 Duverge/
 ├── docker-compose.yml
 ├── .env
-├── .gitignore
-│
-├── gateway/
-│   ├── cmd/
-│   │   └── server/
-│   ├── internal/
-│   │   ├── client/
-│   │   ├── router/
-│   │   ├── server/
-│   │   └── service/
-│   └── proto/
-│
-├── userData/
-│   ├── src/
-│   └── pom.xml
-│
-├── game/
-├── room/
-├── mysql/
+├── gateway/                 # Go external Gateway
+├── room/                    # Go Room gRPC service
+├── userData/userdata/       # Java UserData gRPC service
+├── proto/                   # Protobuf source files
+├── mysql/data/              # Development MySQL data directory
+└── scripts/                 # Black-box and utility scripts
 ```
 
-## Communication
+## Requirements and configuration
 
-### Client → Gateway
+- Docker and Docker Compose
+- Git
+- Optional local development tools: Go 1.26, JDK 21, Maven
 
-The client communicates with the Gateway through HTTP and TCP.
-
-#### HTTP
-
-Gateway HTTP server:
-
-```text
-127.0.0.1:26526
-```
-
-Example health check:
-
-```bash
-curl http://127.0.0.1:26526/health
-```
-
-Expected response:
-
-```text
-ok
-```
-
-### Gateway → UserData
-
-The Gateway communicates with the UserData service using gRPC.
-
-Inside the Docker Compose network:
-
-```text
-userdata:9090
-```
-
-The gRPC API is defined using Protocol Buffers.
-
-Currently supported user operations include:
-
-* User registration
-* User login
-
-Example service definition:
-
-```protobuf
-service UsersLoginService {
-    rpc UserRegistration(UserRegistrationRequest)
-        returns (UserRegistrationResponse);
-
-    rpc UserLogin(UserLoginRequest)
-        returns (UserLoginResponse);
-}
-```
-
-### UserData → MySQL
-
-UserData uses Spring Data JPA to communicate with MySQL.
-
-Inside the Docker Compose network:
-
-```text
-mysql:3306
-```
-
-The default database is:
-
-```text
-user_data
-```
-
-## Configuration
-
-Sensitive configuration should be stored in `.env` rather than committed directly to Git.
-
-Example `.env`:
+Create `.env` next to `docker-compose.yml`:
 
 ```env
-MYSQL_ROOT_PASSWORD=your_root_password
+MYSQL_ROOT_PASSWORD=root
 MYSQL_DATABASE=user_data
-MYSQL_USER=your_user
-MYSQL_PASSWORD=your_password
+MYSQL_USER=rin
+MYSQL_PASSWORD=change-me
 ```
 
-The `.env` file should be excluded from Git:
+Do not commit real credentials. `MYSQL_DATABASE`, `MYSQL_USER`, and `MYSQL_PASSWORD` are passed to MySQL and UserData by Compose.
 
-```gitignore
-.env
-```
-
-Docker Compose can then reference the variables:
-
-```yaml
-environment:
-  MYSQL_USER: ${MYSQL_USER}
-  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-```
-
-UserData can receive the same variables through Docker Compose and use them in `application.yml`.
-
-## Requirements
-
-Before running the project, install:
-
-* Docker
-* Docker Compose
-* Git
-
-For local development outside Docker, the following are also useful:
-
-* Go
-* JDK 21
-* Maven
-
-## Running the Project
-
-Clone the repository:
-
-```bash
-git clone <repository-url>
-cd Duverge
-```
-
-Create a `.env` file in the same directory as `docker-compose.yml`.
-
-Then start the complete project:
-
-```bash
-docker compose up -d
-```
-
-To build all services before starting:
+## Run
 
 ```bash
 docker compose up -d --build
-```
-
-Check running containers:
-
-```bash
 docker compose ps
-```
-
-View logs:
-
-```bash
-docker compose logs
-```
-
-View logs for a specific service:
-
-```bash
-docker compose logs gateway
-docker compose logs userdata
-docker compose logs mysql
-```
-
-Stop the project:
-
-```bash
+docker compose logs -f gateway
 docker compose down
 ```
 
-## Database
+Health check:
 
-The project uses MySQL.
-
-The MySQL database is configured through Docker Compose.
-
-UserData uses JPA to manage the database schema during development.
-
-For development:
-
-```yaml
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: update
+```bash
+curl -i http://127.0.0.1:26526/health
+# 200 OK
+# ok
 ```
 
-## API Example
+To clear the development Redis database, which deletes every key in the selected Redis database:
 
-### User Registration
+```bash
+docker compose exec redis redis-cli FLUSHALL
+```
 
-Endpoint:
+## HTTP API
+
+Gateway HTTP base URL:
 
 ```text
-POST /login
+http://127.0.0.1:26526
 ```
 
-Request:
+All JSON requests use `Content-Type: application/json`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Returns `ok` |
+| `POST` | `/login` | Register or login, selected by `type` |
+| `POST` | `/login_session` | Validate a session |
+| `POST` | `/room/user` | Create a room |
+| `POST` | `/room/room` | Get room info, join, leave, or start a game |
+| `POST` | `/room/userPreparation` | Set or cancel ready state |
+| `POST` | `/room/endGame` | Internal game-end callback |
+
+### Register
+
+```http
+POST /login
+```
 
 ```json
 {
   "type": "register",
-  "accountId": "123456",
-  "password": "abc123"
+  "accountId": "alice",
+  "password": "secret"
 }
 ```
 
-Example:
+Success:
 
-```bash
-curl -X POST http://127.0.0.1:26526/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "register",
-    "accountId": "123456",
-    "password": "abc123"
-  }'
+```json
+{"success": true}
 ```
 
-A successful registration returns:
+### Login
 
-```text
-Registration successful
+```http
+POST /login
 ```
-
-### User Login
-
-Request:
 
 ```json
 {
   "type": "login",
-  "accountId": "123456",
-  "password": "abc123"
+  "accountId": "alice",
+  "password": "secret"
 }
 ```
 
-Example:
+Success:
 
-```bash
-curl -X POST http://127.0.0.1:26526/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "login",
-    "accountId": "123456",
-    "password": "abc123"
-  }'
+```json
+{
+  "success": true,
+  "sessionId": "<opaque-session-id>"
+}
 ```
 
-## Testing
+### Validate a session
 
-Automated testing is used throughout the development process.
+```http
+POST /login_session
+```
 
-Currently, only basic black-box testing is implemented. More comprehensive automated tests will be added once the HTTP request flow is fully implemented and operational.
+```json
+{"sessionId": "<opaque-session-id>"}
+```
 
-* pytest
-* Docker-based integration testing
+Success:
 
-Testing infrastructure will be expanded as the project develops.
+```json
+{"success": true}
+```
 
-## Security
+### Room operations
 
-This project is currently intended for development and educational purposes.
+Create:
 
-For production deployment, additional security measures should be implemented, including:
+```json
+{"type": "createRoom", "sessionId": "<session-id>"}
+```
 
-* HTTPS for external HTTP communication
-* Password hashing instead of storing plaintext passwords
-* Secure session management
-* Authentication and authorization
-* gRPC TLS where required
-* Secure management of database credentials
-* Environment-specific configuration
-* Database migration management
+```json
+{"roomId": "12345"}
+```
 
-## Project Status
+Get members:
 
-Duverge is currently under active development.
+```json
+{
+  "type": "getRoomInfo",
+  "sessionId": "<session-id>",
+  "roomId": "12345"
+}
+```
 
-### Current Progress
+```json
+{"success": true, "roomId": ["alice", "bob"]}
+```
 
-The following features have been implemented:
+> The current response uses `roomId` for the user-ID array. This is a legacy field name; `userIds` would be clearer.
 
-* **User registration and login flow**: Gateway → gRPC → UserData → MySQL → response
-* **Health check endpoint** for service availability monitoring
-* **Docker Compose deployment** for managing the service environment
-* **MySQL persistence** for user data
+Join, leave, and start:
 
-### Planned Development
+```json
+{
+  "type": "joinRoom",
+  "sessionId": "<session-id>",
+  "roomId": "12345"
+}
+```
 
-The following features are planned for future development:
+```json
+{"result": true}
+```
 
-* **User session management**: credential-based sessions with expiration and dedicated session handling
-* **UserData service expansion**: additional user-related data and functionality
-* **Game room system**: room creation, management, and player handling
-* **Gateway TCP server**: support for persistent TCP connections
-* **Game server development**: implementation of core game logic and server-side gameplay systems
+Use `leaveRoom` or `startGame` as the `type` for the other operations. A room has a maximum size of 4. Starting requires the host, at least two players, a waiting room, and every member prepared.
 
+Set ready:
 
-APIs and internal architecture may change during development.
+```json
+{
+  "type": "setPreparation",
+  "sessionId": "<session-id>",
+  "roomId": "12345",
+  "targetStatus": true
+}
+```
+
+```json
+{"status": true}
+```
+
+End-game callback:
+
+```json
+{
+  "type": "endGame",
+  "roomId": "12345"
+}
+```
+
+This endpoint is intended for an internal game service and currently has no service authentication.
+
+## TCP API
+
+Gateway TCP address: `127.0.0.1:26527`.
+
+Each message is framed as:
+
+```text
+[4-byte big-endian body length][JSON body]
+```
+
+The body must be between 1 byte and 64 KiB. Every message uses protocol version `"1.0"`:
+
+```json
+{
+  "version": "1.0",
+  "request_id": "req-001",
+  "type": "heartbeat",
+  "data": null
+}
+```
+
+Authenticate with a login session:
+
+```json
+{
+  "version": "1.0",
+  "request_id": "auth-001",
+  "type": "auth",
+  "data": {"token": "<session-id>"}
+}
+```
+
+Heartbeat:
+
+```json
+{
+  "version": "1.0",
+  "request_id": "hb-001",
+  "type": "heartbeat",
+  "data": null
+}
+```
+
+Heartbeat renews the `user_status:<userId>` TTL to 30 seconds; it does not change the status value. Clients should send it before expiry, preferably every 10 seconds.
+
+Room chat:
+
+```json
+{
+  "version": "1.0",
+  "request_id": "chat-001",
+  "type": "chat",
+  "data": {
+    "type": "room",
+    "data": {
+      "room_id": "12345",
+      "type": "text",
+      "content": "hello room"
+    }
+  }
+}
+```
+
+Private chat uses `"type": "private"` and an inner `"to"` user ID. Chat is currently delivered only to online TCP connections and is not persisted.
+
+TCP error codes currently include:
+
+| Code | Meaning |
+|---|---|
+| `INVALID_MESSAGE` | Invalid JSON, unsupported type, or invalid chat fields |
+| `UNAUTHENTICATED` | Non-auth message before authentication |
+| `AUTHENTICATION_FAILED` | Invalid or expired login session |
+| `FORBIDDEN` | Repeated authentication |
+| `NOT_FOUND` | Missing room or offline private-chat target |
+| `VERSION_MISMATCH` | Unsupported protocol version |
+| `INTERNAL_ERROR` | Redis, network, or unclassified service error |
+| `SERVER_CLOSED_ERROR` | EOF or unexpected connection close |
+
+## Internal gRPC APIs
+
+### UserData service
+
+Source: [`proto/user_info/login.proto`](proto/user_info/login.proto)
+Address: `userdata:9090`
+
+```protobuf
+service UserDataService {
+  rpc UserRegistration(UserRegistrationRequest)
+      returns (UserRegistrationResponse);
+  rpc UserLogin(UserLoginRequest)
+      returns (UserLoginResponse);
+}
+```
+
+`UserRegistration` creates a user and returns `result`. `UserLogin` verifies the BCrypt password and returns `result` plus a random Base64URL session ID.
+
+### Room service
+
+Source: [`proto/room/room_4_gateway.proto`](proto/room/room_4_gateway.proto)
+Address: `room:26528`
+
+RPCs:
+
+```text
+GetRoomInfo
+CreateRoom
+JoinRoom
+LeaveRoom
+SetPreparation
+StartGame
+EndGame
+```
+
+## Redis data dictionary
+
+### Sessions
+
+| Key | Type | TTL | Value |
+|---|---|---:|---|
+| `session:<sessionId>` | String | 7 days | `session_account:<accountId>` |
+| `session_account:<accountId>` | String | 7 days | `session:<sessionId>` |
+
+The two keys are a reverse index. A new login removes the previous session for that account.
+
+### User status
+
+Key: `user_status:<userId>`
+Type: JSON string
+Initial TTL: 30 seconds
+Heartbeat: resets TTL to 30 seconds
+
+```json
+{
+  "user_id": "alice",
+  "status": "in_lobby"
+}
+```
+
+Statuses are `in_lobby`, `in_room`, and `in_game`. Room operations may rewrite the key with no expiration.
+
+### Rooms
+
+Key: `room:<roomId>`
+Type: JSON string
+TTL: none
+
+```json
+{
+  "roomId": "12345",
+  "maximumSize": 4,
+  "userIds": ["alice", "bob"],
+  "hosterId": "alice",
+  "prepared": ["alice"],
+  "status": "waiting"
+}
+```
+
+Room statuses are `waiting`, `in_game`, and `finished`. Empty rooms are deleted.
+
+## MySQL data dictionary
+
+Database: `${MYSQL_DATABASE}`, normally `user_data`.
+
+Table: `users`
+
+| Column | Meaning |
+|---|---|
+| `id` | Auto-increment primary key |
+| `account_id` | Login account |
+| `password` | BCrypt password hash |
+
+JPA currently uses `ddl-auto: update` for development. UserData exposes registration and login through gRPC only.
+
+## State model
+
+```text
+in_lobby ── joinRoom ──► in_room ── startGame ──► in_game
+   ▲                         │                      │
+   └──────── leaveRoom ◄─────┘                      │
+                         endGame ◄─────────────────┘
+```
+
+## Development and testing
+
+```bash
+cd gateway && go test ./...
+cd ../room && go test ./...
+go run scripts/heartbeat_blackbox.go
+```
+
+The black-box flow exercises login, TCP authentication, periodic heartbeat, room presence, room chat, and private chat. Run it only against an isolated development stack.
+
+## Security and known limitations
+
+- Redis has no password or TLS in the default Compose setup.
+- HTTP and gRPC are not configured with TLS.
+- `/room/endGame` has no internal authentication.
+- Online TCP connections are kept in one Gateway process's memory and are not shared across replicas.
+- Chat is not persisted.
+- Room keys have no expiration until an empty room is deleted.
+- Production deployments should use schema migrations instead of `ddl-auto: update`.
+- Add input-length validation, rate limiting, session revocation, replay protection, and fine-grained authorization before production use.
+- The Game service is not enabled; TCP `game` is currently a placeholder.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT License: see [LICENSE](LICENSE).

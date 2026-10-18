@@ -1,372 +1,799 @@
 # Duverge
 
-[English](README.md) | [中文](README_ch.md)
+[English](README.md) | 中文
 
-Duverge 是一个类游戏后端项目，采用模块化、面向服务的架构进行设计。
+Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Gateway、Room、UserData 分层服务，使用 HTTP、TCP、gRPC、Redis 和 MySQL 组合实现用户认证、会话管理、房间管理、准备状态、游戏状态和聊天等基础能力。
 
-项目目前仍在积极开发中，由多个后端服务组成，这些服务通过 HTTP、TCP 和 gRPC 进行通信。
+> 当前项目仍在开发中。本文档描述的是仓库当前代码中的实际接口和数据结构，不代表已经稳定的生产协议。接口、字段和 Redis key 可能继续变化。
 
-## 架构
+## 目录
 
-### 概览
+- [架构与服务](#架构与服务)
+- [运行环境与启动](#运行环境与启动)
+- [HTTP API](#http-api)
+- [TCP 协议](#tcp-协议)
+- [内部 gRPC API](#内部-grpc-api)
+- [Redis 数据字典](#redis-数据字典)
+- [MySQL 数据字典](#mysql-数据字典)
+- [状态机与业务约束](#状态机与业务约束)
+- [错误处理](#错误处理)
+- [测试与验证](#测试与验证)
+- [安全与已知限制](#安全与已知限制)
 
-整个架构分为四个主要服务：
+## 架构与服务
 
-* Gateway
-* UserData
-* Room
-* Game
+```text
+Client
+  ├── HTTP :26526 ───────┐
+  └── TCP  :26527         │
+                         ▼
+                    Gateway (Go)
+                  ┌──────┴──────┐
+                  │             │
+          gRPC :9090      gRPC :26528
+                  │             │
+              UserData       Room (Go)
+             (Java)           │
+                  │             │
+                MySQL ◄──── Redis :6379
+```
 
-本项目采用微服务架构，并使用 Docker Compose 对各个服务进行管理和部署。
+| 服务 | 语言 | 容器/端口 | 职责 |
+|---|---|---|---|
+| `gateway` | Go 1.26 | `26526` HTTP、`26527` TCP | 对外入口、会话、TCP 认证、heartbeat、聊天、HTTP 房间 API |
+| `userdata` | Java 21 / Spring Boot | Compose 内部 `9090` gRPC | 用户注册、BCrypt 密码校验、生成登录 session |
+| `room` | Go 1.26 | `26528` gRPC | 房间、成员、准备状态、开始/结束游戏 |
+| `redis` | Redis | `6379` | session、用户状态、房间状态 |
+| `mysql` | MySQL 8.4 | `3306` | UserData 用户持久化 |
+| `adminer` | Adminer | `8080` | 开发环境数据库管理界面 |
+| `redisinsight` | RedisInsight | `5540` | 开发环境 Redis 管理界面 |
+| `game` | 未启用 | - | Compose 中暂时注释，TCP `game` 消息目前没有业务实现 |
 
-项目的主要目的，是学习独立服务之间的通信方式，以及如何处理不同容器之间的通信错误。
+Gateway 使用 Docker Compose 网络中的服务名访问依赖：
 
-### 通信
-
-来自客户端的请求，包括 HTTP 和 TCP 连接，都会首先由 Gateway 接收。
-
-Gateway 会根据连接类型和请求用途对请求进行路由。
-
-后端服务之间使用 gRPC 进行通信。
-
-### 语言选择
-
-Gateway 和 Room 服务使用 **Go** 实现，主要因为 Go 提供了轻量级的 goroutine 和高效的并发支持，因此适合处理大量并发连接。
-
-UserData 服务使用 **Java 和 Spring Boot** 实现，主要因为其对 CRUD 操作、数据库连接以及数据持久化具有成熟的支持，例如 Spring Data JPA。
-
-## 技术栈
-
-* **Go**
-* **Java**
-* **Spring Boot**
-* **gRPC / Protocol Buffers**
-* **MySQL**
-* **Docker Compose**
-* **Maven**
-* **Git**
+```text
+redis:6379
+userdata:9090
+room:26528
+mysql:3306
+```
 
 ## 项目结构
-
-当前项目结构：
 
 ```text
 Duverge/
 ├── docker-compose.yml
-├── .env
-├── .gitignore
-│
-├── gateway/
-│   ├── cmd/
-│   │   └── server/
-│   ├── internal/
-│   │   ├── client/
-│   │   ├── router/
-│   │   ├── server/
-│   │   └── service/
-│   └── proto/
-│
-├── userData/
-│   ├── src/
-│   └── pom.xml
-│
-├── game/
-├── room/
-├── mysql/
+├── .env                         # 本地环境变量，不应提交
+├── gateway/                     # 对外 Gateway，Go
+│   ├── cmd/server/main.go
+│   ├── internal/router/         # HTTP 路由
+│   ├── internal/server/         # HTTP/TCP 服务
+│   ├── internal/service/html/   # HTTP handlers
+│   ├── internal/service/tcp/    # TCP 协议、认证、heartbeat、聊天
+│   └── proto/                   # Gateway 生成的 gRPC 代码
+├── room/                        # Room gRPC 服务，Go
+├── userData/userdata/           # UserData gRPC 服务，Java
+├── proto/                       # gRPC/Protobuf 源文件
+├── mysql/data/                  # 开发环境 MySQL 持久化目录
+├── scripts/                     # 黑盒/辅助脚本
+└── runtime-validation-report.md # 最近一次运行验证记录（如存在）
 ```
 
-## 通信
+## 运行环境与启动
 
-### Client → Gateway
+### 要求
 
-客户端通过 HTTP 和 TCP 与 Gateway 进行通信。
+- Docker
+- Docker Compose
+- Git
+- 本地开发时可选：Go 1.26、JDK 21、Maven
 
-#### HTTP
+### 配置 `.env`
 
-Gateway HTTP 服务：
+在 `docker-compose.yml` 同级目录创建 `.env`：
 
-```text
-127.0.0.1:26526
+```env
+MYSQL_ROOT_PASSWORD=root
+MYSQL_DATABASE=user_data
+MYSQL_USER=rin
+MYSQL_PASSWORD=change-me
 ```
 
-健康检查示例：
+不要在源码或提交中保存真实密码。`MYSQL_DATABASE`、`MYSQL_USER` 和 `MYSQL_PASSWORD` 会传给 `userdata` 与 `mysql`。
+
+### 启动、查看和停止
 
 ```bash
-curl http://127.0.0.1:26526/health
+# 首次启动或代码/Dockerfile 改动后
+docker compose up -d --build
+
+# 查看状态
+docker compose ps
+
+# 查看日志
+docker compose logs -f gateway
+docker compose logs -f room
+docker compose logs -f userdata
+
+# 停止容器但保留 MySQL 数据卷目录
+docker compose down
 ```
 
-预期返回：
+健康检查：
+
+```bash
+curl -i http://127.0.0.1:26526/health
+# HTTP/1.1 200 OK
+# ok
+```
+
+清空开发环境 Redis（会删除当前 Redis 数据库中的全部 key，谨慎执行）：
+
+```bash
+docker compose exec redis redis-cli FLUSHALL
+```
+
+## HTTP API
+
+Gateway HTTP 地址：
+
+```text
+http://127.0.0.1:26526
+```
+
+所有 JSON 请求都应使用：
+
+```http
+Content-Type: application/json
+```
+
+### `GET /health`
+
+服务存活检查，不依赖认证。
+
+响应：
 
 ```text
 ok
 ```
 
-### Gateway → UserData
+状态码：`200`
 
-Gateway 使用 gRPC 与 UserData 服务进行通信。
+### `POST /login`
 
-在 Docker Compose 网络中：
+同一路由通过 `type` 区分注册和登录。
 
-```text
-userdata:9090
-```
-
-gRPC API 使用 Protocol Buffers 进行定义。
-
-目前支持的用户操作包括：
-
-* 用户注册
-* 用户登录
-
-示例服务定义：
-
-```protobuf
-service UsersLoginService {
-    rpc UserRegistration(UserRegistrationRequest)
-        returns (UserRegistrationResponse);
-
-    rpc UserLogin(UserLoginRequest)
-        returns (UserLoginResponse);
-}
-```
-
-### UserData → MySQL
-
-UserData 使用 Spring Data JPA 与 MySQL 进行通信。
-
-在 Docker Compose 网络中：
-
-```text
-mysql:3306
-```
-
-默认数据库：
-
-```text
-user_data
-```
-
-## 配置
-
-敏感配置信息应该存储在 `.env` 文件中，而不是直接提交到 Git。
-
-`.env` 示例：
-
-```env
-MYSQL_ROOT_PASSWORD=your_root_password
-MYSQL_DATABASE=user_data
-MYSQL_USER=your_user
-MYSQL_PASSWORD=your_password
-```
-
-`.env` 文件应该被 Git 忽略：
-
-```gitignore
-.env
-```
-
-Docker Compose 可以通过以下方式引用这些环境变量：
-
-```yaml
-environment:
-  MYSQL_USER: ${MYSQL_USER}
-  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-```
-
-UserData 也可以通过 Docker Compose 获取这些环境变量，并在 `application.yml` 中使用。
-
-## 环境要求
-
-运行项目之前，请安装：
-
-* Docker
-* Docker Compose
-* Git
-
-如果需要在 Docker 之外进行本地开发，还建议安装：
-
-* Go
-* JDK 21
-* Maven
-
-## 运行项目
-
-克隆仓库：
-
-```bash
-git clone <repository-url>
-cd Duverge
-```
-
-在与 `docker-compose.yml` 相同的目录下创建 `.env` 文件。
-
-然后启动完整项目：
-
-```bash
-docker compose up -d
-```
-
-如果需要在启动前重新构建所有服务：
-
-```bash
-docker compose up -d --build
-```
-
-查看正在运行的容器：
-
-```bash
-docker compose ps
-```
-
-查看所有服务的日志：
-
-```bash
-docker compose logs
-```
-
-查看指定服务的日志：
-
-```bash
-docker compose logs gateway
-docker compose logs userdata
-docker compose logs mysql
-```
-
-停止项目：
-
-```bash
-docker compose down
-```
-
-## 数据库
-
-项目使用 MySQL。
-
-MySQL 数据库通过 Docker Compose 进行配置。
-
-UserData 在开发环境中使用 JPA 管理数据库 Schema。
-
-开发环境配置：
-
-```yaml
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: update
-```
-
-## API 示例
-
-### 用户注册
+#### 注册
 
 请求：
-
-```text
-POST /login
-```
-
-请求内容：
 
 ```json
 {
   "type": "register",
-  "accountId": "123456",
-  "password": "abc123"
+  "accountId": "alice",
+  "password": "secret"
 }
 ```
 
-示例：
+成功响应 `200`：
 
-```bash
-curl -X POST http://127.0.0.1:26526/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "register",
-    "accountId": "123456",
-    "password": "abc123"
-  }'
+```json
+{
+  "success": true
+}
 ```
 
-注册成功后返回：
+错误：
 
-```text
-Registration successful
-```
+| 状态码 | 条件 |
+|---|---|
+| `400` | JSON 非法或 `type` 不支持 |
+| `401` | `accountId` 已存在 |
+| `500` | UserData 或数据库错误 |
 
-### 用户登录
+密码由 UserData 使用 BCrypt 保存，Gateway 不直接访问 `users` 表。
 
-请求内容：
+#### 登录
+
+请求：
 
 ```json
 {
   "type": "login",
-  "accountId": "123456",
-  "password": "abc123"
+  "accountId": "alice",
+  "password": "secret"
 }
 ```
 
-示例：
+成功响应 `200`：
 
-```bash
-curl -X POST http://127.0.0.1:26526/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "login",
-    "accountId": "123456",
-    "password": "abc123"
-  }'
+```json
+{
+  "success": true,
+  "sessionId": "<opaque-session-id>"
+}
 ```
 
-## 测试
+错误：
 
-项目在开发过程中使用自动化测试。
+| 状态码 | 条件 |
+|---|---|
+| `400` | JSON 非法或 `type` 不支持 |
+| `401` | 用户名或密码错误 |
+| `500` | UserData、Redis 或 session 创建失败 |
 
-目前仅使用简单黑盒测试，预计正式跑通HTTP链路后会添加
+登录成功后，Gateway 会在 Redis 创建两个 7 天 TTL 的 session key，并创建一个 30 秒 TTL 的用户状态 key（详见 [Redis 数据字典](#redis-数据字典)）。
 
-* pytest
-* 基于 Docker 的集成测试
+### `POST /login_session`
 
-随着项目开发的推进，测试基础设施将进一步完善。
+校验 Gateway 创建的 session。
 
-## 安全
+请求：
 
-本项目目前主要用于开发和学习目的。
+```json
+{
+  "sessionId": "<opaque-session-id>"
+}
+```
 
-如果用于生产环境，还需要进一步实现以下安全措施：
+成功响应 `200`：
 
-* 对外部 HTTP 通信使用 HTTPS
-* 使用密码哈希，而不是以明文形式存储密码
-* 安全的 Session 管理
-* Authentication 和 Authorization
-* 在需要时为 gRPC 使用 TLS
-* 安全管理数据库凭据
-* 针对不同环境进行配置管理
-* 数据库迁移管理
+```json
+{
+  "success": true
+}
+```
 
-## 项目状态
+错误：
 
-Duverge 目前仍处于积极开发阶段。
+| 状态码 | 条件 |
+|---|---|
+| `400` | JSON 非法 |
+| `401` | session 不存在、为空或已过期 |
 
-### 当前进展
+### `POST /room/user`
 
-目前已完成以下功能：
+当前支持的 `type`：
 
-* **用户注册与登录链路**：Gateway → gRPC → UserData → MySQL → 返回结果
-* **健康检查（Health Check）**：用于检查服务运行状态
-* **Docker Compose 部署**：使用 Docker Compose 管理和部署服务
-* **MySQL 数据持久化**：实现用户数据的持久化存储
+#### 创建房间：`createRoom`
 
-### 后续开发规划
+请求：
 
-后续计划实现以下功能：
+```json
+{
+  "type": "createRoom",
+  "sessionId": "<session-id>"
+}
+```
 
-* **用户 Session 管理**：基于凭证的 Session 机制，支持过期时间及独立的 Session 管理
-* **UserData 服务扩展**：增加更多用户相关数据及功能
-* **游戏房间系统**：实现房间创建、管理以及玩家管理等功能
-* **Gateway TCP 服务器**：支持持久化 TCP 连接
-* **游戏服务器开发**：实现游戏核心逻辑及服务端游戏机制
+成功响应 `200`：
 
-项目的 API 和内部架构可能会随着开发进度发生变化。
+```json
+{
+  "roomId": "12345"
+}
+```
+
+创建者自动成为房主并加入房间，初始房间状态为 `waiting`，最大人数为 `4`。
+
+#### 错误
+
+| 状态码 | 条件 |
+|---|---|
+| `400` | JSON 非法或 type 不支持 |
+| `500` | session 查询或 Room gRPC 调用失败 |
+
+### `POST /room/room`
+
+请求必须包含：
+
+```json
+{
+  "type": "<operation>",
+  "sessionId": "<session-id>",
+  "roomId": "<room-id>"
+}
+```
+
+#### 查询房间：`getRoomInfo`
+
+响应 `200`：
+
+```json
+{
+  "success": true,
+  "roomId": ["alice", "bob"]
+}
+```
+
+> 当前响应字段名 `roomId` 实际承载用户 ID 数组，这是现有代码行为；后续建议改成 `userIds`。
+
+#### 加入房间：`joinRoom`
+
+响应 `200`：
+
+```json
+{
+  "result": true
+}
+```
+
+约束：用户必须处于 `in_lobby`，房间必须处于 `waiting`，且房间未满。
+
+#### 离开房间：`leaveRoom`
+
+响应 `200`：
+
+```json
+{
+  "result": true
+}
+```
+
+用户状态变为 `in_lobby`；房间空后会删除 `room:<roomId>`。
+
+#### 开始游戏：`startGame`
+
+响应 `200`：
+
+```json
+{
+  "result": true
+}
+```
+
+约束：请求者必须是房主、房间处于 `waiting`、所有成员已准备、至少有 2 名玩家。成功后房间变为 `in_game`，所有成员变为 `in_game`。
+
+#### 错误
+
+| 状态码 | 条件 |
+|---|---|
+| `400` | JSON 非法或 type 不支持 |
+| `500` | session 查询、Redis 或 Room gRPC 错误 |
+
+当前 HTTP handler 对 Room 业务错误多数统一返回 `500`，未细分为 `404/409/403`。
+
+### `POST /room/userPreparation`
+
+设置当前用户的准备状态。
+
+请求：
+
+```json
+{
+  "type": "setPreparation",
+  "sessionId": "<session-id>",
+  "roomId": "12345",
+  "targetStatus": true
+}
+```
+
+响应：
+
+```json
+{
+  "status": true
+}
+```
+
+约束：用户必须在房间内，房间必须处于 `waiting`。重复设置 `true` 是幂等的；设置 `false` 会取消准备。
+
+### `POST /room/endGame`
+
+该接口设计为由 Game 服务调用，不是普通用户接口。
+
+请求：
+
+```json
+{
+  "type": "endGame",
+  "roomId": "12345"
+}
+```
+
+响应：
+
+```json
+{
+  "result": true
+}
+```
+
+结束游戏后房间回到 `waiting`，准备列表清空，成员状态回到 `in_room`。
+
+当前接口没有额外的内部服务认证，不能直接暴露到不可信网络。
+
+## TCP 协议
+
+Gateway TCP 地址：
+
+```text
+127.0.0.1:26527
+```
+
+### 帧格式
+
+每条消息使用长度前缀帧：
+
+```text
+[4 字节 Big-Endian body length][JSON body]
+```
+
+- body 长度必须大于 `0`
+- body 最大 `64 KiB`
+- JSON 协议版本为 `"1.0"`
+- `request_id` 可选，用于客户端匹配 response
+
+基础消息：
+
+```json
+{
+  "version": "1.0",
+  "request_id": "req-001",
+  "type": "heartbeat",
+  "data": null
+}
+```
+
+### 认证：`auth`
+
+必须是连接建立后的第一类业务消息：
+
+```json
+{
+  "version": "1.0",
+  "request_id": "auth-001",
+  "type": "auth",
+  "data": {
+    "token": "<session-id>"
+  }
+}
+```
+
+成功响应：
+
+```json
+{
+  "version": "1.0",
+  "type": "response",
+  "success": true
+}
+```
+
+认证成功后 Gateway 会：
+
+1. 校验 `session:<sessionId>`；
+2. 将当前 TCP 连接注册到内存连接管理器；
+3. 创建/覆盖 `user_status:<userId>`；
+4. 允许 heartbeat、chat、game 消息。
+
+### Heartbeat：`heartbeat`
+
+请求：
+
+```json
+{
+  "version": "1.0",
+  "request_id": "hb-001",
+  "type": "heartbeat",
+  "data": null
+}
+```
+
+成功响应：
+
+```json
+{
+  "version": "1.0",
+  "type": "response",
+  "success": true
+}
+```
+
+Heartbeat 只执行 Redis `EXPIRE user_status:<userId> 30`，不会改变用户状态字段。客户端应至少在 30 秒 TTL 到期前发送一次，推荐每 10 秒发送一次。
+
+### Chat：`chat`
+
+#### 房间聊天
+
+```json
+{
+  "version": "1.0",
+  "request_id": "chat-001",
+  "type": "chat",
+  "data": {
+    "type": "room",
+    "data": {
+      "room_id": "12345",
+      "type": "text",
+      "content": "hello room"
+    }
+  }
+}
+```
+
+Gateway 会读取 `room:<roomId>` 的 `userIds`，向当前在线成员发送：
+
+```json
+{
+  "version": "1.0",
+  "type": "chat",
+  "success": true,
+  "data": {
+    "message_id": "<uuid>",
+    "sender_id": "alice",
+    "type": "text",
+    "content": "hello room"
+  }
+}
+```
+
+发送者随后收到对应 request 的成功 response。
+
+#### 私聊
+
+```json
+{
+  "version": "1.0",
+  "request_id": "chat-002",
+  "type": "chat",
+  "data": {
+    "type": "private",
+    "data": {
+      "to": "bob",
+      "type": "text",
+      "content": "hello"
+    }
+  }
+}
+```
+
+目标用户必须存在于 Gateway 的在线连接管理器中。当前聊天消息没有持久化到 MySQL 或 Redis。
+
+### `game`
+
+`game` 消息类型已经保留，但当前 Gateway 只记录日志，没有业务响应或游戏逻辑。
+
+### TCP 错误码
+
+错误 response 的 `data`：
+
+```json
+{
+  "error_code": "INVALID_MESSAGE",
+  "detail": "非法消息格式"
+}
+```
+
+当前错误码：
+
+| error_code | 含义 | 常见触发条件 |
+|---|---|---|
+| `INVALID_MESSAGE` | 消息格式错误 | 非法 JSON、未知 type、chat 字段缺失 |
+| `UNAUTHENTICATED` | 未认证 | 未认证连接发送非 auth |
+| `AUTHENTICATION_FAILED` | 认证失败 | session 不存在、过期或没有用户 |
+| `FORBIDDEN` | 禁止操作 | 已认证连接重复 auth |
+| `NOT_FOUND` | 资源不存在 | 房间不存在、私聊目标不在线 |
+| `VERSION_MISMATCH` | 协议版本不支持 | version 不是 `1.0` |
+| `INTERNAL_ERROR` | 内部错误 | Redis、网络或未分类服务错误 |
+| `SERVER_CLOSED_ERROR` | 连接已关闭 | EOF/UnexpectedEOF |
+
+认证失败和版本错误返回错误后会关闭 TCP 连接；普通业务错误通常保持连接。
+
+## 内部 gRPC API
+
+### UserData：`UserDataService`
+
+Proto：[`proto/user_info/login.proto`](proto/user_info/login.proto)
+
+服务地址：`userdata:9090`
+
+| RPC | 请求 | 响应 | 作用 |
+|---|---|---|---|
+| `UserRegistration` | `account_id`, `password` | `result` | 创建用户，账号重复时 `result=false` |
+| `UserLogin` | `account_id`, `password` | `result`, `session_id` | BCrypt 校验密码；成功生成 32 字节随机 Base64URL session |
+
+UserData 负责用户凭据和密码哈希；Gateway 负责将 UserData 返回的 session 写入 Redis。
+
+### Room：`RoomService`
+
+Proto：[`proto/room/room_4_gateway.proto`](proto/room/room_4_gateway.proto)
+
+服务地址：`room:26528`
+
+| RPC | 作用 |
+|---|---|
+| `GetRoomInfo` | 获取房间成员 ID |
+| `CreateRoom` | 创建 5 位房间号，房主自动加入 |
+| `JoinRoom` | 加入 waiting 且未满的房间 |
+| `LeaveRoom` | 离开房间，空房间删除 |
+| `SetPreparation` | 设置/取消准备 |
+| `StartGame` | 房主在所有成员准备后开始游戏 |
+| `EndGame` | 结束游戏并恢复 waiting 状态 |
+
+## Redis 数据字典
+
+Redis 默认无密码，开发环境地址为 `redis:6379`。下面的 key 是当前代码实际使用的格式。
+
+### Session 双向索引
+
+#### `session:<sessionId>`
+
+类型：String
+TTL：`7 days`
+值：
+
+```text
+session_account:<accountId>
+```
+
+用途：由 TCP auth、`/login_session` 和 Gateway 房间 HTTP API 反查账号。
+
+#### `session_account:<accountId>`
+
+类型：String
+TTL：`7 days`
+值：
+
+```text
+session:<sessionId>
+```
+
+用途：保证同一账号只有一个当前 session。重新登录时 Gateway 会删除旧的双向索引。
+
+### 用户在线/房间状态
+
+#### `user_status:<userId>`
+
+类型：String
+首次创建 TTL：`30 seconds`
+Heartbeat：只刷新 TTL 到 `30 seconds`
+Room/Game 服务更新时：TTL 通常为 `0`（永久，直到业务显式覆盖或删除）
+
+当前 JSON 值：
+
+```json
+{
+  "user_id": "alice",
+  "status": "in_lobby"
+}
+```
+
+允许的状态：
+
+| 状态 | 含义 |
+|---|---|
+| `in_lobby` | 已登录，在大厅 |
+| `in_room` | 已加入房间 |
+| `in_game` | 游戏进行中 |
+
+注意：Gateway 的 heartbeat 不更新 `status`，只续期；Room 的加入、离开、开始游戏和结束游戏负责更新状态 JSON。
+
+### 房间
+
+#### `room:<roomId>`
+
+类型：String
+TTL：`0`（无过期时间，除非房间为空时删除）
+值：
+
+```json
+{
+  "roomId": "12345",
+  "maximumSize": 4,
+  "userIds": ["alice", "bob"],
+  "hosterId": "alice",
+  "prepared": ["alice"],
+  "status": "waiting"
+}
+```
+
+字段：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `roomId` | string | 5 位房间号 |
+| `maximumSize` | integer | 当前固定为 `4` |
+| `userIds` | string[] | 房间成员 |
+| `hosterId` | string | 房主用户 ID |
+| `prepared` | string[] | 已准备成员 |
+| `status` | string | `waiting`、`in_game`、`finished` |
+
+Room 使用 Redis `WATCH`/事务更新 `room:<roomId>` 和相关 `user_status:<userId>`，避免并发加入、离开和准备操作覆盖彼此的更新。
+
+### Redis key 总览
+
+| Pattern | 类型 | TTL | 写入者 | 读取者 |
+|---|---|---:|---|---|
+| `session:<sessionId>` | String | 7 天 | Gateway | Gateway |
+| `session_account:<accountId>` | String | 7 天 | Gateway | Gateway |
+| `user_status:<userId>` | JSON String | 创建时 30 秒；Room 更新后通常永久 | Gateway/Room | Gateway/Room |
+| `room:<roomId>` | JSON String | 永久 | Room | Gateway/Room |
+
+## MySQL 数据字典
+
+数据库由 `.env` 中的 `MYSQL_DATABASE` 指定，默认是 `user_data`。UserData 使用 JPA `ddl-auto: update`，开发环境会自动更新表结构。
+
+### `users`
+
+实体：`com.duverge.userdata.entity.User`
+表名：`users`
+
+| 列 | 类型/属性 | 说明 |
+|---|---|---|
+| `id` | BIGINT，自增，主键 | JPA `IDENTITY` 主键 |
+| `account_id` | VARCHAR（JPA 默认命名策略） | 用户登录账号，代码通过 `findByAccountId` 查询 |
+| `password` | VARCHAR | BCrypt 哈希，不保存明文密码 |
+
+当前 UserData 只通过 gRPC 暴露注册和登录，不提供用户查询、修改密码或删除用户的公开 API。
+
+## 状态机与业务约束
+
+### 用户状态
+
+```text
+登录成功
+   │
+   ▼
+in_lobby ── joinRoom ──► in_room ── startGame ──► in_game
+   ▲                         │                      │
+   └──────── leaveRoom ◄─────┘                      │
+                                                     │
+                         endGame ◄───────────────────┘
+                              ▼
+                          in_room
+```
+
+### 房间状态
+
+```text
+创建 ──► waiting ── startGame ──► in_game
+  ▲          │                         │
+  │          └── leave/准备操作         │
+  └──────────── endGame ◄──────────────┘
+```
+
+开始游戏的必要条件：
+
+1. 请求者是 `hosterId`；
+2. 房间状态为 `waiting`；
+3. 所有成员都在 `prepared`；
+4. 成员数量至少为 `2`；
+5. 成员数量不能超过 `maximumSize`（当前为 `4`）。
+
+## 测试与验证
+
+Gateway 和 Room 是独立 Go module：
+
+```bash
+cd gateway && go test ./...
+cd ../room && go test ./...
+```
+
+当前测试文件较少，主要通过 Docker Compose 和黑盒脚本验证真实服务链路。若使用仓库中的 heartbeat 测试脚本：
+
+```bash
+go run scripts/heartbeat_blackbox.go
+```
+
+脚本会覆盖登录、TCP auth、heartbeat、房间和聊天链路。运行前请确认服务已启动；测试账号和 Redis 数据应使用隔离的开发环境。
+
+## 安全与已知限制
+
+当前项目适合本地开发和学习，不应直接作为生产服务部署：
+
+- Compose 中 Redis 没有密码和 TLS；
+- HTTP 没有 HTTPS；
+- gRPC 没有 TLS 或服务间认证；
+- `/room/endGame` 没有内部调用认证；
+- TCP 连接管理器是单实例内存状态，Gateway 多副本时不会共享在线连接；
+- 聊天消息目前不持久化；
+- Room key 永久保存，只有空房间会删除；
+- UserData 使用 `ddl-auto: update`，生产环境应使用正式 migration；
+- 应增加请求体大小、字段长度、账号格式和速率限制；
+- 应考虑 session 撤销、重放防护和更细粒度的授权；
+- `game` 服务尚未启用，TCP `game` 消息目前只是占位；
+- 当前若客户端正常关闭 TCP，服务端会记录 EOF 日志，这是连接生命周期日志，不等同于业务失败。
 
 ## License
 
