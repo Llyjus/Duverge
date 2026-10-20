@@ -2,15 +2,21 @@ package server
 
 import (
 	"context"
+	"room/internal/metrics"
 
 	"room/internal/service"
 	pb "room/proto/gen"
+	"time"
 )
 
 func (s *RoomServer) CreateRoom(
 	ctx context.Context,
 	req *pb.CreateRoomRequest,
 ) (*pb.CreateRoomResponse, error) {
+	started := time.Now()
+	defer func() {
+		metrics.RequestDuration.WithLabelValues("room", "create_room", "total").Observe(time.Since(started).Seconds())
+	}()
 
 	roomID, err := service.CreateRoom(
 		s.client,
