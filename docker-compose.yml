@@ -43,6 +43,9 @@ services:
         MYSQL_DATABASE: ${MYSQL_DATABASE}
         MYSQL_USER: ${MYSQL_USER}
         MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "26529:26529"
+      - "9091:9091"
     depends_on:
       mysql:
         condition: service_started
