@@ -13,7 +13,7 @@ scrape_configs:
   - job_name: "userdata"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["userData:9091"]
+      - targets: ["userdata:9091"]
 
   # - job_name: "game"
   #   static_configs:

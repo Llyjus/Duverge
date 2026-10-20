@@ -3,11 +3,11 @@ services:
     build: ./gateway
     container_name: gateway
     ports:
-      - "26526:26526" 
+      - "26526:26526"
       - "26527:26527"
-      - "9091:9091"
+    expose:
+      - "9091"
     depends_on:
-      # - game
       - room
       - userdata
     networks:
@@ -26,7 +26,8 @@ services:
     container_name: room
     ports:
       - "26528:26528"
-      - "9091:9091"
+    expose:
+      - "9091"
     networks:
       - game-net
     environment:
@@ -40,12 +41,13 @@ services:
       dockerfile: Dockerfile
     container_name: userdata
     environment:
-        MYSQL_DATABASE: ${MYSQL_DATABASE}
-        MYSQL_USER: ${MYSQL_USER}
-        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "26529:26529"
-      - "9091:9091"
+    expose:
+      - "9091"
     depends_on:
       mysql:
         condition: service_started
@@ -53,17 +55,6 @@ services:
         condition: service_started
     networks:
       - game-net
-
-  # test:
-  #   build: ./test
-  #   container_name: test
-  #   depends_on:
-  #     - game
-  #     - room
-  #     - userdata
-  #     - gateway
-  #   networks:
-  #     - game-net
 
   mysql:
     image: mysql:8.4
@@ -82,6 +73,7 @@ services:
 
   adminer:
     image: adminer
+    container_name: adminer
     ports:
       - "8080:8080"
     networks:
@@ -90,6 +82,9 @@ services:
   redis:
     image: redis:latest
     container_name: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
     networks:
@@ -100,9 +95,44 @@ services:
     container_name: redisinsight
     ports:
       - "5540:5540"
+    volumes:
+      - redisinsight_data:/data
     networks:
       - game-net
-      
-networks: 
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    networks:
+      - game-net
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - game-net
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  redis_data:
+  redisinsight_data:
+
+networks:
   game-net:
     driver: bridge
