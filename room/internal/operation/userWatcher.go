@@ -76,7 +76,13 @@ func ExitRoom(
 		// Commit
 		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 			pipe.Set(ctx, userStatusKey, newStatusJSON, 0)
-			pipe.Set(ctx, roomKey, newRoomJSON, 0)
+
+			// if room is empty, delete it, otherwise update it
+			if len(room.UserIDs) == 0 {
+				pipe.Del(ctx, roomKey)
+			} else {
+				pipe.Set(ctx, roomKey, newRoomJSON, 0)
+			}
 
 			return nil
 		})
