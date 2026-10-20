@@ -21,3 +21,17 @@ spring:
   #   redis:
   #     host: redis
   #     port: 6379
+
+
+management:
+  server:
+    port: 9091
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+    prometheus:
+      access: unrestricted
