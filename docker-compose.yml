@@ -25,6 +25,7 @@ services:
     container_name: room
     ports:
       - "26528:26528"
+      - "9091:9091"
     networks:
       - game-net
     environment:
