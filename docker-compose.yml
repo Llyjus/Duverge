@@ -46,6 +46,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "26529:26529"
+      - "127.0.0.1:9091:9091"
     expose:
       - "9091"
     depends_on:
