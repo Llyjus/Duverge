@@ -5,6 +5,7 @@ services:
     ports:
       - "26526:26526" 
       - "26527:26527"
+      - "9091:9091"
     depends_on:
       # - game
       - room
