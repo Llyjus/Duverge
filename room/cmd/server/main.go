@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 	"room/internal/server"
 	pb "room/proto/gen"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
 
@@ -32,6 +34,18 @@ func main() {
 		return
 	}
 	defer listener.Close()
+
+	// Register metrics endpoint.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		fmt.Println("Room metrics server running on :9091")
+
+		if err := http.ListenAndServe(":9091", mux); err != nil {
+			fmt.Println("Metrics server failed:", err)
+		}
+	}()
 
 	// gRPC server
 	grpcServer := grpc.NewServer()
