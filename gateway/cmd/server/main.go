@@ -11,6 +11,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -18,6 +22,18 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	// Register metrics endpoint.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		fmt.Println("Room metrics server running on :9091")
+
+		if err := http.ListenAndServe(":9091", mux); err != nil {
+			fmt.Println("Metrics server failed:", err)
+		}
+	}()
 
 	// Create a new redis client
 	redisClient := redis_client.NewClient()
