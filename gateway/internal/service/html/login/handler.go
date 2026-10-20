@@ -4,14 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"gateway/internal/client/userdata"
+	"gateway/internal/metrics"
 	serverresponse "gateway/internal/service/html/serverResponse"
 	"net/http"
+	"time"
 
 	redis "github.com/redis/go-redis/v9"
 )
 
 func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		operation := "unknown"
+		defer func() {
+			if operation != "unknown" {
+				metrics.RequestDuration.WithLabelValues("gateway", operation, "http_total").Observe(time.Since(started).Seconds())
+			}
+		}()
+
 		fmt.Println("Received login request")
 
 		// Decode the request body into a struct
@@ -24,6 +34,9 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 		if err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
+		}
+		if req.Type == "login" || req.Type == "register" {
+			operation = req.Type
 		}
 
 		switch req.Type {
