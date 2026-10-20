@@ -11,13 +11,17 @@ import com.example.userdata.grpc.UserRegistrationRequest;
 import com.example.userdata.grpc.UserRegistrationResponse;
 
 import io.grpc.stub.StreamObserver;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 @GrpcService
 public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
     private final UserService userService;
+    private final MeterRegistry meterRegistry;
 
-    public UserServer(UserService userService) {
+    public UserServer(UserService userService, MeterRegistry meterRegistry) {
         this.userService = userService;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -25,9 +29,9 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
             UserLoginRequest request,
             StreamObserver<UserLoginResponse> responseObserver) {
 
-        boolean userCheckResult = userService.checkUser(
-            request.getAccountId(), 
-            request.getPassword());
+        boolean userCheckResult = recordLatency("userLogin", () -> userService.checkUser(
+            request.getAccountId(),
+            request.getPassword()));
         
         var sessionId = "";
         if (userCheckResult) {
@@ -50,9 +54,9 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
             UserRegistrationRequest request,
             StreamObserver<UserRegistrationResponse> responseObserver) {
 
-        boolean userSetResult = userService.setNewUser(
-            request.getAccountId(), 
-            request.getPassword());
+        boolean userSetResult = recordLatency("userRegistration", () -> userService.setNewUser(
+            request.getAccountId(),
+            request.getPassword()));
 
         UserRegistrationResponse response = UserRegistrationResponse.newBuilder()
                 .setResult(userSetResult)
@@ -60,5 +64,13 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();
+    }
+
+    private boolean recordLatency(String method, java.util.function.BooleanSupplier operation) {
+        Timer timer = Timer.builder("userdata.grpc.server.requests")
+                .description("UserData gRPC request duration")
+                .tag("method", method)
+                .register(meterRegistry);
+        return timer.record(operation::getAsBoolean);
     }
 }

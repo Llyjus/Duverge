@@ -26,6 +26,10 @@ spring:
 management:
   server:
     port: 9091
+  metrics:
+    distribution:
+      percentiles-histogram:
+        userdata.grpc.server.requests: true
   endpoints:
     web:
       exposure:
