@@ -15,7 +15,7 @@ spring:
 
   grpc:
     server:
-      port: 9090
+      port: 26529
 
   # data:
   #   redis:

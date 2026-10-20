@@ -30,7 +30,7 @@ Client
                     Gateway (Go)
                   ┌──────┴──────┐
                   │             │
-          gRPC :9090      gRPC :26528
+          gRPC :26529     gRPC :26528
                   │             │
               UserData       Room (Go)
              (Java)           │
@@ -41,7 +41,7 @@ Client
 | 服务 | 语言 | 容器/端口 | 职责 |
 |---|---|---|---|
 | `gateway` | Go 1.26 | `26526` HTTP、`26527` TCP | 对外入口、会话、TCP 认证、heartbeat、聊天、HTTP 房间 API |
-| `userdata` | Java 21 / Spring Boot | Compose 内部 `9090` gRPC | 用户注册、BCrypt 密码校验、生成登录 session |
+| `userdata` | Java 21 / Spring Boot | Compose 内部 `26529` gRPC | 用户注册、BCrypt 密码校验、生成登录 session |
 | `room` | Go 1.26 | `26528` gRPC | 房间、成员、准备状态、开始/结束游戏 |
 | `redis` | Redis | `6379` | session、用户状态、房间状态 |
 | `mysql` | MySQL 8.4 | `3306` | UserData 用户持久化 |
@@ -53,7 +53,7 @@ Gateway 使用 Docker Compose 网络中的服务名访问依赖：
 
 ```text
 redis:6379
-userdata:9090
+userdata:26529
 room:26528
 mysql:3306
 ```
@@ -586,7 +586,7 @@ Gateway 会读取 `room:<roomId>` 的 `userIds`，向当前在线成员发送：
 
 Proto：[`proto/user_info/login.proto`](proto/user_info/login.proto)
 
-服务地址：`userdata:9090`
+服务地址：`userdata:26529`
 
 | RPC | 请求 | 响应 | 作用 |
 |---|---|---|---|

@@ -46,7 +46,7 @@ func main() {
 	}
 
 	// Create a new userdata client
-	userDataClient, err := userdata.NewClient("userdata:9090")
+	userDataClient, err := userdata.NewClient("userdata:26529")
 	if err != nil {
 		fmt.Println("Error creating userdata client:", err)
 		return

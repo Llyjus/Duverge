@@ -10,7 +10,7 @@ public class GrpcTester {
     public static void main(String[] args) {
 
         ManagedChannel channel = ManagedChannelBuilder
-                .forAddress("localhost", 9090)
+                .forAddress("localhost", 26529)
                 .usePlaintext()
                 .build();
 

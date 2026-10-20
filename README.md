@@ -16,7 +16,7 @@ Client
                     Gateway (Go)
                   ┌──────┴──────┐
                   │             │
-          gRPC :9090      gRPC :26528
+          gRPC :26529     gRPC :26528
                   │             │
               UserData       Room (Go)
                   │             │
@@ -26,7 +26,7 @@ Client
 | Service | Stack | Container port | Responsibility |
 |---|---|---:|---|
 | `gateway` | Go 1.26 | `26526` HTTP, `26527` TCP | External entry point, sessions, TCP auth, heartbeat, chat, room HTTP API |
-| `userdata` | Java 21 / Spring Boot | `9090` gRPC | User registration, BCrypt password verification, login-session generation |
+| `userdata` | Java 21 / Spring Boot | `26529` gRPC | User registration, BCrypt password verification, login-session generation |
 | `room` | Go 1.26 | `26528` gRPC | Rooms, membership, ready state, game state |
 | `redis` | Redis | `6379` | Sessions, user status, rooms |
 | `mysql` | MySQL 8.4 | `3306` | User persistence |
@@ -38,7 +38,7 @@ Inside the Compose network, services use:
 
 ```text
 redis:6379
-userdata:9090
+userdata:26529
 room:26528
 mysql:3306
 ```
@@ -331,7 +331,7 @@ TCP error codes currently include:
 ### UserData service
 
 Source: [`proto/user_info/login.proto`](proto/user_info/login.proto)
-Address: `userdata:9090`
+Address: `userdata:26529`
 
 ```protobuf
 service UserDataService {

@@ -10,6 +10,6 @@ COPY userdata/src ./src
 
 RUN mvn package -DskipTests
 
-EXPOSE 9090
+EXPOSE 26529
 
 CMD ["java", "-jar", "target/userdata-0.0.1-SNAPSHOT.jar"]
