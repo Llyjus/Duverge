@@ -60,6 +60,22 @@ func CreateRoom(
 			return "", err
 		}
 		if res {
+
+			// change user status to in room
+			userStatusKey := "user_status:" + HosterID
+			userStatus := &entity.UserStatus{
+				UserID: HosterID,
+				Status: entity.UserStatusInRoom,
+			}
+			userStatusJSON, err := json.Marshal(userStatus)
+			if err != nil {
+				return "", err
+			}
+			_, err = client.Set(context.Background(), userStatusKey, userStatusJSON, 0).Result()
+			if err != nil {
+				return "", err
+			}
+
 			return roomCode, nil
 		}
 	}
