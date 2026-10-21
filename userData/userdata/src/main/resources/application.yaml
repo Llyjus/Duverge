@@ -30,6 +30,8 @@ management:
     distribution:
       percentiles-histogram:
         userdata.grpc.server.requests: true
+        userdata.password.operation: true
+        userdata.database.operation: true
   endpoints:
     web:
       exposure:
