@@ -41,7 +41,7 @@ Client
 | 服务 | 语言 | 容器/端口 | 职责 |
 |---|---|---|---|
 | `gateway` | Go 1.26 | `26526` HTTP、`26527` TCP | 对外入口、会话、TCP 认证、heartbeat、聊天、HTTP 房间 API |
-| `userdata` | Java 21 / Spring Boot | Compose 内部 `26529` gRPC | 用户注册、BCrypt 密码校验、生成登录 session |
+| `userdata` | Java 25 / Spring Boot | Compose 内部 `26529` gRPC | 用户注册、BCrypt 密码校验、生成登录 session |
 | `room` | Go 1.26 | `26528` gRPC | 房间、成员、准备状态、开始/结束游戏 |
 | `redis` | Redis | `6379` | session、用户状态、房间状态 |
 | `mysql` | MySQL 8.4 | `3306` | UserData 用户持久化 |
@@ -86,7 +86,7 @@ Duverge/
 - Docker
 - Docker Compose
 - Git
-- 本地开发时可选：Go 1.26、JDK 21、Maven
+- 本地开发时可选：Go 1.26、JDK 25、Maven
 
 ### 配置 `.env`
 

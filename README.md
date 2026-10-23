@@ -26,7 +26,7 @@ Client
 | Service | Stack | Container port | Responsibility |
 |---|---|---:|---|
 | `gateway` | Go 1.26 | `26526` HTTP, `26527` TCP | External entry point, sessions, TCP auth, heartbeat, chat, room HTTP API |
-| `userdata` | Java 21 / Spring Boot | `26529` gRPC | User registration, BCrypt password verification, login-session generation |
+| `userdata` | Java 25 / Spring Boot | `26529` gRPC | User registration, BCrypt password verification, login-session generation |
 | `room` | Go 1.26 | `26528` gRPC | Rooms, membership, ready state, game state |
 | `redis` | Redis | `6379` | Sessions, user status, rooms |
 | `mysql` | MySQL 8.4 | `3306` | User persistence |
@@ -63,7 +63,7 @@ Duverge/
 
 - Docker and Docker Compose
 - Git
-- Optional local development tools: Go 1.26, JDK 21, Maven
+- Optional local development tools: Go 1.26, JDK 25, Maven
 
 Create `.env` next to `docker-compose.yml`:
 
