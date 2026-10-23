@@ -1,23 +1,39 @@
 package com.duverge.userdata.service;
 
-import org.springframework.stereotype.Service;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
+import org.springframework.stereotype.Service;
 
 import com.duverge.userdata.entity.User;
 import com.duverge.userdata.internal.Encoder;
 import com.duverge.userdata.repository.UserRepository;
+
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 @Service
 public class UserService {
 
     final UserRepository userRepository;
     private final MeterRegistry meterRegistry;
+    // Atomic counters to track in-flight password hash operations
+    private final AtomicInteger encodeInFlight = new AtomicInteger();
+    private final AtomicInteger verifyInFlight = new AtomicInteger();
 
     public UserService(UserRepository userRepository, MeterRegistry meterRegistry) {
         this.userRepository = userRepository;
         this.meterRegistry = meterRegistry;
+
+        // Register gauges for in-flight password hash operations
+        Gauge.builder("password.hash.in.flight", encodeInFlight, AtomicInteger::get)
+                .tag("operation", "encode")
+                .description("Password hash operations currently in progress")
+                .register(meterRegistry);
+        Gauge.builder("password.hash.in.flight", verifyInFlight, AtomicInteger::get)
+                .tag("operation", "verify")
+                .description("Password hash operations currently in progress")
+                .register(meterRegistry);
     }
 
     public boolean setNewUser(String accountId, String password) {
@@ -30,7 +46,8 @@ public class UserService {
         }
 
         user.setAccountId(accountId);
-        user.setPassword(timedPassword("encode", () -> Encoder.encode(password)));
+        // Hash the password and set it on the user object
+        user.setPassword(timedPassword("encode", () -> trackEncodeHash(() -> Encoder.encode(password))));
 
         timedDatabase("save", () -> userRepository.save(user));
         // deal with false of connection
@@ -53,7 +70,7 @@ public class UserService {
         if (user == null) {
             return false;
         }
-        return timedPassword("verify", () -> Encoder.matches(password, user.getPassword()));
+        return timedPassword("verify", () -> trackVerifyHash(() -> Encoder.matches(password, user.getPassword())));
     }
 
     public User getUser(String accountId) {
@@ -70,6 +87,24 @@ public class UserService {
                 .tag("operation", operation)
                 .register(meterRegistry)
                 .record(action);
+    }
+
+    // Track the number of in-flight password hash operations
+    <T> T trackEncodeHash(java.util.function.Supplier<T> action) {
+        return trackHash(encodeInFlight, action);
+    }
+
+    <T> T trackVerifyHash(java.util.function.Supplier<T> action) {
+        return trackHash(verifyInFlight, action);
+    }
+
+    private <T> T trackHash(AtomicInteger inFlight, java.util.function.Supplier<T> action) {
+        inFlight.incrementAndGet();
+        try {
+            return action.get();
+        } finally {
+            inFlight.decrementAndGet();
+        }
     }
 
     private <T> T timedDatabase(String operation, java.util.function.Supplier<T> action) {
