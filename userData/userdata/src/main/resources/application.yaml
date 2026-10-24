@@ -22,6 +22,13 @@ spring:
   #     host: redis
   #     port: 6379
 
+userdata:
+  password-hash:
+    # 0 disables the execution limit for an unconstrained benchmark baseline.
+    max-concurrency: ${USERDATA_PASSWORD_HASH_MAX_CONCURRENCY:10}
+    acquire-timeout: ${USERDATA_PASSWORD_HASH_ACQUIRE_TIMEOUT:5s}
+    max-waiters: ${USERDATA_PASSWORD_HASH_MAX_WAITERS:100}
+
 
 management:
   server:
@@ -31,6 +38,7 @@ management:
       percentiles-histogram:
         userdata.grpc.server.requests: true
         userdata.password.operation: true
+        userdata.password.permit.wait: true
         userdata.database.operation: true
   endpoints:
     web:
