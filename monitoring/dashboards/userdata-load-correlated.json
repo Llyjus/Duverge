@@ -1,0 +1,130 @@
+{
+  "annotations": {"list": []},
+  "description": "UserData and Gateway load correlation: CPU, BCrypt, gRPC, HTTP, threads and queues.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 0},
+      "id": 1, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "100 * process_cpu_usage{job=\"userdata\"}", "legendFormat": "UserData process CPU", "refId": "A"},
+        {"expr": "100 * process_cpu_usage{job=\"gateway\"}", "legendFormat": "Gateway process CPU", "refId": "B"},
+        {"expr": "100 * process_cpu_usage{job=\"room\"}", "legendFormat": "Room process CPU", "refId": "C"}
+      ], "title": "Process CPU", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2, "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P50 {{operation}}", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P95 {{operation}}", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P99 {{operation}}", "refId": "C"}
+      ], "title": "BCrypt duration", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3, "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le, method) (rate(userdata_grpc_server_requests_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "UserData gRPC P50 {{method}}", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le, method) (rate(userdata_grpc_server_requests_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "UserData gRPC P95 {{method}}", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le, method) (rate(userdata_grpc_server_requests_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "UserData gRPC P99 {{method}}", "refId": "C"}
+      ], "title": "UserData gRPC total duration", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4, "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le, operation) (rate(service_operation_duration_seconds_bucket{service=\"gateway\",stage=\"http_total\"}[$__rate_interval])))", "legendFormat": "Gateway HTTP P50 {{operation}}", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le, operation) (rate(service_operation_duration_seconds_bucket{service=\"gateway\",stage=\"http_total\"}[$__rate_interval])))", "legendFormat": "Gateway HTTP P95 {{operation}}", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le, operation) (rate(service_operation_duration_seconds_bucket{service=\"gateway\",stage=\"http_total\"}[$__rate_interval])))", "legendFormat": "Gateway HTTP P99 {{operation}}", "refId": "C"}
+      ], "title": "Gateway HTTP total duration", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5, "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (le, operation) (rate(userdata_database_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "DB P95 {{operation}}", "refId": "A"},
+        {"expr": "histogram_quantile(0.99, sum by (le, operation) (rate(userdata_database_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "DB P99 {{operation}}", "refId": "B"}
+      ], "title": "UserData database duration", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "jvm_threads_live_threads{job=\"userdata\"}", "legendFormat": "JVM live threads", "refId": "A"},
+        {"expr": "hikaricp_connections_active{job=\"userdata\"}", "legendFormat": "DB active connections", "refId": "B"},
+        {"expr": "hikaricp_connections_pending{job=\"userdata\"}", "legendFormat": "DB pending connections", "refId": "C"},
+        {"expr": "executor_queued_tasks{job=\"userdata\"}", "legendFormat": "Spring executor queued tasks", "refId": "D"},
+        {"expr": "executor_active_threads{job=\"userdata\"}", "legendFormat": "Spring executor active threads", "refId": "E"}
+      ], "title": "Threads and exported queues", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 24},
+      "id": 7, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum by (service, operation) (rate(service_operation_duration_seconds_count{service=\"gateway\",stage=\"http_total\"}[$__rate_interval]))", "legendFormat": "Gateway {{operation}}", "refId": "A"},
+        {"expr": "sum by (method) (rate(userdata_grpc_server_requests_seconds_count{job=\"userdata\"}[$__rate_interval]))", "legendFormat": "UserData {{method}}", "refId": "B"}
+      ], "title": "Request rate", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "cgroup v2 counters; absent on platforms that do not expose these metrics.",
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 24},
+      "id": 8, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "rate(container_cpu_cfs_throttled_periods_total{name=\"userdata\"}[$__rate_interval]) / clamp_min(rate(container_cpu_cfs_periods_total{name=\"userdata\"}[$__rate_interval]), 1)", "legendFormat": "Throttled period ratio", "refId": "A"},
+        {"expr": "rate(container_cpu_cfs_throttled_seconds_total{name=\"userdata\"}[$__rate_interval])", "legendFormat": "Throttled seconds/s", "refId": "B"}
+      ], "title": "Container CPU throttling (if cAdvisor metrics are scraped)", "type": "timeseries"
+    }
+
+    ,{
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Instantaneous value. Short BCrypt operations can fall between Prometheus scrapes; use the peak panel below for reliable load-test concurrency.",
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 32},
+      "id": 9, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "password_hash_in_flight{job=\"userdata\"}", "legendFormat": "Current {{operation}}", "refId": "A"}
+      ], "title": "Password hash concurrency (current)", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Maximum concurrent hashes observed since the UserData process started. Resets when UserData restarts.",
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 32},
+      "id": 10, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "password_hash_in_flight_max{job=\"userdata\"}", "legendFormat": "Peak {{operation}}", "refId": "A"}
+      ], "title": "Password hash concurrency (peak since start)", "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["loadtest", "userdata", "bcrypt"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "UserData Load Correlation",
+  "uid": "userdata-load-correlation",
+  "version": 1
+}

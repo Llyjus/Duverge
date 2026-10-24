@@ -41,3 +41,5 @@ build/
 client_mocking.txt
 
 dashboards/
+!monitoring/dashboards/
+!monitoring/dashboards/userdata-load-correlated.json

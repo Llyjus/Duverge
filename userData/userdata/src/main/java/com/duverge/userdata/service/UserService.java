@@ -20,6 +20,8 @@ public class UserService {
     // Atomic counters to track in-flight password hash operations
     private final AtomicInteger encodeInFlight = new AtomicInteger();
     private final AtomicInteger verifyInFlight = new AtomicInteger();
+    private final AtomicInteger encodeInFlightMax = new AtomicInteger();
+    private final AtomicInteger verifyInFlightMax = new AtomicInteger();
 
     public UserService(UserRepository userRepository, MeterRegistry meterRegistry) {
         this.userRepository = userRepository;
@@ -33,6 +35,14 @@ public class UserService {
         Gauge.builder("password.hash.in.flight", verifyInFlight, AtomicInteger::get)
                 .tag("operation", "verify")
                 .description("Password hash operations currently in progress")
+                .register(meterRegistry);
+        Gauge.builder("password.hash.in.flight.max", encodeInFlightMax, AtomicInteger::get)
+                .tag("operation", "encode")
+                .description("Maximum concurrent password hash operations since service start")
+                .register(meterRegistry);
+        Gauge.builder("password.hash.in.flight.max", verifyInFlightMax, AtomicInteger::get)
+                .tag("operation", "verify")
+                .description("Maximum concurrent password hash operations since service start")
                 .register(meterRegistry);
     }
 
@@ -91,15 +101,17 @@ public class UserService {
 
     // Track the number of in-flight password hash operations
     <T> T trackEncodeHash(java.util.function.Supplier<T> action) {
-        return trackHash(encodeInFlight, action);
+        return trackHash(encodeInFlight, encodeInFlightMax, action);
     }
 
     <T> T trackVerifyHash(java.util.function.Supplier<T> action) {
-        return trackHash(verifyInFlight, action);
+        return trackHash(verifyInFlight, verifyInFlightMax, action);
     }
 
-    private <T> T trackHash(AtomicInteger inFlight, java.util.function.Supplier<T> action) {
-        inFlight.incrementAndGet();
+    private <T> T trackHash(AtomicInteger inFlight, AtomicInteger inFlightMax,
+            java.util.function.Supplier<T> action) {
+        int active = inFlight.incrementAndGet();
+        inFlightMax.accumulateAndGet(active, Math::max);
         try {
             return action.get();
         } finally {

@@ -11,6 +11,7 @@ scrape_configs:
       - targets: ["room:9091"]
 
   - job_name: "userdata"
+    scrape_interval: 1s
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["userdata:9091"]

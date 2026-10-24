@@ -55,21 +55,30 @@ class UserServicePasswordMetricsTests {
 
         assertInFlight("verify", 0);
         assertInFlight("encode", 0);
+        assertInFlightMax("verify", 1);
+        assertInFlightMax("encode", 1);
     }
 
     @Test
     void trackHashCountsAnActiveTaskAndRestoresAfterCompletion() {
-        String result = userService.trackEncodeHash(() -> {
-            assertInFlight("encode", 1);
+        String result = userService.trackEncodeHash(() -> userService.trackEncodeHash(() -> {
+            assertInFlight("encode", 2);
+            assertInFlightMax("encode", 2);
             return "done";
-        });
+        }));
 
         assertEquals("done", result);
         assertInFlight("encode", 0);
+        assertInFlightMax("encode", 2);
     }
 
     private void assertInFlight(String operation, double expected) {
         assertEquals(expected, meterRegistry.get("password.hash.in.flight")
+                .tag("operation", operation).gauge().value());
+    }
+
+    private void assertInFlightMax(String operation, double expected) {
+        assertEquals(expected, meterRegistry.get("password.hash.in.flight.max")
                 .tag("operation", operation).gauge().value());
     }
 }
