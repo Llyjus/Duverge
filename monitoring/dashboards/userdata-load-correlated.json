@@ -20,13 +20,15 @@
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "P95 is a percentile, not the mean. Mean duration is shown alongside it.",
       "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
       "id": 2, "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi"}},
       "targets": [
         {"expr": "histogram_quantile(0.50, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P50 {{operation}}", "refId": "A"},
         {"expr": "histogram_quantile(0.95, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P95 {{operation}}", "refId": "B"},
-        {"expr": "histogram_quantile(0.99, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P99 {{operation}}", "refId": "C"}
+        {"expr": "histogram_quantile(0.99, sum by (le, operation) (rate(userdata_password_operation_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "BCrypt P99 {{operation}}", "refId": "C"},
+        {"expr": "sum by (operation) (rate(userdata_password_operation_seconds_sum{job=\"userdata\"}[$__rate_interval])) / sum by (operation) (rate(userdata_password_operation_seconds_count{job=\"userdata\"}[$__rate_interval]))", "legendFormat": "BCrypt mean {{operation}}", "refId": "D"}
       ], "title": "BCrypt duration", "type": "timeseries"
     },
     {
@@ -98,7 +100,7 @@
 
     ,{
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "description": "Instantaneous value. Short BCrypt operations can fall between Prometheus scrapes; use the peak panel below for reliable load-test concurrency.",
+      "description": "Instantaneous sampled value. Bursts shorter than the scrape period can be missed; the peak panel records the exact service-side maximum.",
       "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
       "gridPos": {"h": 7, "w": 12, "x": 0, "y": 32},
       "id": 9, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
@@ -115,6 +117,17 @@
       "targets": [
         {"expr": "password_hash_in_flight_max{job=\"userdata\"}", "legendFormat": "Peak {{operation}}", "refId": "A"}
       ], "title": "Password hash concurrency (peak since start)", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "The 5-second series shows burst throughput. The 1-minute series smooths the same completions over a longer window and is not the instantaneous capacity.",
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 39},
+      "id": 11, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum by (operation) (rate(userdata_password_operation_seconds_count{job=\"userdata\"}[5s]))", "legendFormat": "{{operation}} (5s rate)", "refId": "A"},
+        {"expr": "sum by (operation) (rate(userdata_password_operation_seconds_count{job=\"userdata\"}[1m]))", "legendFormat": "{{operation}} (1m avg)", "refId": "B"}
+      ], "title": "Password hash throughput", "type": "timeseries"
     }
   ],
   "refresh": "5s",
