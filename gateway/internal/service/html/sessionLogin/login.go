@@ -2,7 +2,9 @@ package sessionLogin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	internalerrors "gateway/internal/errors"
 	"gateway/internal/service/auth"
 	serverresponse "gateway/internal/service/html/serverResponse"
 	"net/http"
@@ -27,7 +29,11 @@ func HandleLoginSession(redisClient *redis.Client) http.HandlerFunc {
 		// Authenticate the session ID
 		accountID, err := auth.SessionAuthentication(r.Context(), redisClient, req.SessionID)
 		if err != nil {
-			http.Error(w, "Invalid session ID", http.StatusUnauthorized)
+			if errors.Is(err, internalerrors.ErrRedisUnavailable) {
+				http.Error(w, "Session service unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			http.Error(w, "Unable to authenticate session", http.StatusInternalServerError)
 			return
 		}
 

@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
+
+	internalerrors "gateway/internal/errors"
 
 	redis "github.com/redis/go-redis/v9"
 )
@@ -71,8 +74,11 @@ func SessionAuthentication(
 	session = "session:" + session
 
 	accountID, err := redisClient.Get(ctx, session).Result()
-	if err != nil && err != redis.Nil {
-		return "", err
+	if err != nil {
+		if err == redis.Nil {
+			return "", nil
+		}
+		return "", fmt.Errorf("%w: %w", internalerrors.ErrRedisUnavailable, err)
 	}
 	accountID = strings.TrimPrefix(accountID, "session_account:")
 	return accountID, nil
