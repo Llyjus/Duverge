@@ -18,6 +18,8 @@ import (
 
 func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Start measuring the duration of the request
 		started := time.Now()
 		operation := "unknown"
 		defer func() {
@@ -105,6 +107,7 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 	}
 }
 
+// check if the error is a context deadline exceeded error
 func isRequestTimeout(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded
 }
