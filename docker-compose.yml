@@ -54,7 +54,7 @@ services:
       - "9091"
     depends_on:
       mysql:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_started
     networks:
@@ -74,6 +74,12 @@ services:
       - "3306:3306"
     networks:
       - game-net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=\"$${MYSQL_USER}\" --password=\"$${MYSQL_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
 
   adminer:
     image: adminer
