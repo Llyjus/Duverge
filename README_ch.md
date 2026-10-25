@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Gateway、Room、UserData 分层服务，使用 HTTP、TCP、gRPC、Redis 和 MySQL 组合实现用户认证、会话管理、房间管理、准备状态、游戏状态和聊天等基础能力。
+Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Gateway、Room、UserData 分层服务，使用 HTTP、TCP、gRPC、Redis 和 MySQL 实现用户认证、会话管理、房间管理、准备状态、游戏状态和聊天，并通过 Prometheus 与 Grafana 监测服务和压测指标。
 
 > 当前项目仍在开发中。本文档描述的是仓库当前代码中的实际接口和数据结构，不代表已经稳定的生产协议。接口、字段和 Redis key 可能继续变化。
 
@@ -10,14 +10,15 @@ Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Ga
 
 - [架构与服务](#架构与服务)
 - [运行环境与启动](#运行环境与启动)
+- [监控系统](#监控系统)
 - [HTTP API](#http-api)
 - [TCP 协议](#tcp-协议)
 - [Gateway 超时设置](#gateway-超时设置)
+- [密码哈希并发限制](#密码哈希并发限制)
 - [内部 gRPC API](#内部-grpc-api)
 - [Redis 数据字典](#redis-数据字典)
 - [MySQL 数据字典](#mysql-数据字典)
 - [状态机与业务约束](#状态机与业务约束)
-- [错误处理](#错误处理)
 - [测试与验证](#测试与验证)
 - [安全与已知限制](#安全与已知限制)
 
@@ -41,11 +42,13 @@ Client
 
 | 服务 | 语言 | 容器/端口 | 职责 |
 |---|---|---|---|
-| `gateway` | Go 1.26 | `26526` HTTP、`26527` TCP | 对外入口、会话、TCP 认证、heartbeat、聊天、HTTP 房间 API |
-| `userdata` | Java 25 / Spring Boot | Compose 内部 `26529` gRPC | 用户注册、BCrypt 密码校验、生成登录 session |
-| `room` | Go 1.26 | `26528` gRPC | 房间、成员、准备状态、开始/结束游戏 |
+| `gateway` | Go 1.26 | `26526` HTTP、`26527` TCP、`9091` metrics（仅内部） | 对外入口、会话、TCP 认证、heartbeat、聊天、HTTP 房间 API |
+| `userdata` | Java 25 / Spring Boot | `26529` gRPC、`127.0.0.1:9091` metrics | 用户注册、BCrypt 密码校验、生成登录 session |
+| `room` | Go 1.26 | `26528` gRPC、`9091` metrics（仅内部） | 房间、成员、准备状态、开始/结束游戏 |
 | `redis` | Redis | `6379` | session、用户状态、房间状态 |
 | `mysql` | MySQL 8.4 | `3306` | UserData 用户持久化 |
+| `prometheus` | Prometheus | `127.0.0.1:9090` | 抓取并保存各服务指标 |
+| `grafana` | Grafana | `127.0.0.1:3000` | 查询 Prometheus 并展示仪表盘 |
 | `adminer` | Adminer | `8080` | 开发环境数据库管理界面 |
 | `redisinsight` | RedisInsight | `5540` | 开发环境 Redis 管理界面 |
 | `game` | 未启用 | - | Compose 中暂时注释，TCP `game` 消息目前没有业务实现 |
@@ -71,11 +74,13 @@ Duverge/
 │   ├── internal/server/         # HTTP/TCP 服务
 │   ├── internal/service/html/   # HTTP handlers
 │   ├── internal/service/tcp/    # TCP 协议、认证、heartbeat、聊天
-│   └── proto/                   # Gateway 生成的 gRPC 代码
+│   ├── proto/                   # Gateway 生成的 gRPC 代码
+│   └── test/                    # Gateway 韧性测试和 K6 脚本
 ├── room/                        # Room gRPC 服务，Go
 ├── userData/userdata/           # UserData gRPC 服务，Java
 ├── proto/                       # gRPC/Protobuf 源文件
 ├── mysql/data/                  # 开发环境 MySQL 持久化目录
+├── monitoring/                  # Prometheus 配置、Grafana provisioning 和 dashboard
 ├── scripts/                     # 黑盒/辅助脚本
 └── runtime-validation-report.md # 最近一次运行验证记录（如存在）
 ```
@@ -132,6 +137,76 @@ curl -i http://127.0.0.1:26526/health
 
 ```bash
 docker compose exec redis redis-cli FLUSHALL
+```
+
+## 监控系统
+
+`docker compose up -d --build` 会同时启动 Prometheus 和 Grafana。Prometheus 配置位于 [`monitoring/prometheus.yml`](monitoring/prometheus.yml)，Grafana 会自动配置 Prometheus 数据源并加载 [`monitoring/dashboards/userdata-load-correlated.json`](monitoring/dashboards/userdata-load-correlated.json)。
+
+| 页面/服务 | 地址 | 用途 |
+|---|---|---|
+| Prometheus | <http://127.0.0.1:9090> | PromQL 查询；在 **Status → Targets** 检查抓取目标是否为 `UP` |
+| Grafana | <http://127.0.0.1:3000> | **Dashboards → Load Tests → UserData Load Correlation** |
+| UserData 指标 | <http://127.0.0.1:9091/actuator/prometheus> | 本机直接查看 Spring/Micrometer 指标 |
+
+Grafana 初始账号密码为镜像默认值 `admin` / `admin`（若已更改则使用现有凭据）；首次进入后请修改默认密码。Gateway 和 Room 的 `9091` 指标端口只在 Compose 网络内提供，Prometheus 可以访问，但没有映射到宿主机。
+
+Prometheus 每 5 秒抓取 Gateway 和 Room 的 `/metrics`；UserData 的采集间隔是 250 ms，抓取超时是 200 ms。仪表盘可关联查看进程 CPU、BCrypt 耗时/并发/等待、UserData gRPC 与数据库耗时、Gateway HTTP 耗时、请求速率及 JVM/连接池指标。
+
+常用 PromQL：
+
+```promql
+# BCrypt 当前执行数，按 encode / verify 区分
+password_hash_in_flight{job="userdata",operation="encode"}
+password_hash_in_flight{job="userdata",operation="verify"}
+
+# BCrypt 总执行数及等待许可数
+password_hash_active{job="userdata"}
+password_hash_waiting{job="userdata"}
+
+# BCrypt 执行耗时 P95
+histogram_quantile(0.95,
+  sum by (le, operation) (
+    rate(userdata_password_operation_seconds_bucket{job="userdata"}[1m])
+  )
+)
+
+# BCrypt 每秒完成次数
+sum by (operation) (
+  rate(userdata_password_operation_seconds_count{job="userdata"}[1m])
+)
+
+# 获取 BCrypt 执行许可的等待时间 P95
+histogram_quantile(0.95,
+  sum by (le) (
+    rate(userdata_password_permit_wait_seconds_bucket{job="userdata"}[1m])
+  )
+)
+```
+
+主要 UserData 指标：
+
+| 指标 | 含义 |
+|---|---|
+| `password_hash_active` | 正在执行的 BCrypt 任务总数 |
+| `password_hash_waiting` | 当前等待执行许可的请求数 |
+| `password_hash_active_max` | 进程启动以来观测到的 BCrypt 执行并发峰值 |
+| `password_hash_in_flight{operation}` | 当前正在执行的哈希数，`operation` 为 `encode` 或 `verify` |
+| `password_hash_in_flight_max{operation}` | 按操作区分的进程生命周期并发峰值 |
+| `userdata_password_operation_seconds_*` | encode/verify 执行耗时、次数和直方图桶 |
+| `userdata_password_permit_wait_seconds_*` | 获取 BCrypt 执行许可的等待耗时 |
+| `password_hash_permit_timeout_total` | 等待许可超时而拒绝的次数 |
+| `password_hash_permit_queue_full_total` | 等待队列达到上限而拒绝的次数 |
+| `userdata_grpc_server_requests_seconds_*` | UserData gRPC 请求耗时 |
+| `userdata_database_operation_seconds_*` | UserData 数据库操作耗时 |
+
+并发峰值 Gauge 在 UserData 重启时重置。短暂的压测阶段可能刚好发生在两次采集之间，导致瞬时峰值没有被抓到；可延长测试阶段或缩短采集间隔。Prometheus `rate()` 是窗口平均速率，并非瞬时并发数或单次请求耗时。
+
+注意：仪表盘的 **Container CPU throttling** 面板依赖 cAdvisor/cgroup 指标，但当前 Prometheus 没有配置 cAdvisor target，因此该面板可能为空。**Process CPU** 面板使用 Spring 的 `process_cpu_usage` 查询 UserData；Gateway/Room 的 Go collector 提供的是 `process_cpu_seconds_total`，所以它们在当前面板查询中可能没有数据。Go 进程 CPU 可用以下查询查看，结果单位是 CPU-seconds/second，`1` 相当于一个 CPU 核满载：
+
+```promql
+rate(process_cpu_seconds_total{job="gateway"}[1m])
+rate(process_cpu_seconds_total{job="room"}[1m])
 ```
 
 ## HTTP API
@@ -612,6 +687,30 @@ GATEWAY_TCP_WRITE_TIMEOUT=5s
 docker compose up -d --build gateway
 ```
 
+## 密码哈希并发限制
+
+UserData 的注册 `PasswordEncoder.encode()` 和登录 `PasswordEncoder.matches()` 共用一个公平 Semaphore。Compose 默认配置如下：
+
+| 环境变量 | 默认值 | 作用 |
+|---|---:|---|
+| `USERDATA_PASSWORD_HASH_MAX_CONCURRENCY` | `10` | 同时执行 BCrypt 的最大数量；设为 `0` 可关闭执行并发上限 |
+| `USERDATA_PASSWORD_HASH_ACQUIRE_TIMEOUT` | `5s` | 等待执行许可的最长时间 |
+| `USERDATA_PASSWORD_HASH_MAX_WAITERS` | `100` | 等待队列最大长度；设为 `0` 表示无可用许可时立即拒绝 |
+
+修改根目录 `.env` 后重建 UserData：
+
+```env
+USERDATA_PASSWORD_HASH_MAX_CONCURRENCY=5
+USERDATA_PASSWORD_HASH_ACQUIRE_TIMEOUT=5s
+USERDATA_PASSWORD_HASH_MAX_WAITERS=100
+```
+
+```bash
+docker compose up -d --build userdata
+```
+
+达到等待队列上限或获取许可超时会返回明确错误，不会被当成密码错误或注册成功。对照压测时应同时比较 BCrypt 执行 P95、等待 P95、端到端 P95、完成速率、CPU 和拒绝次数。
+
 ## 内部 gRPC API
 
 ### UserData：`UserDataService`
@@ -802,13 +901,17 @@ cd gateway && go test ./...
 cd ../room && go test ./...
 ```
 
-当前测试文件较少，主要通过 Docker Compose 和黑盒脚本验证真实服务链路。若使用仓库中的 heartbeat 测试脚本：
+Gateway 的 deadline、下游不可用、调用重试次数和 Redis 断连语义测试在 `gateway/test/resiliencetest`，会由 `go test ./...` 一并运行。Room 的 Redis 集成测试需要显式设置 `RESILIENCE_REDIS_ADDR` 并连接测试 Redis；运行前请阅读对应测试文件，确保测试 key 使用隔离环境。
+
+仓库里的 K6 生命周期脚本位于 `gateway/test/k6/benchmark.js`，需要包含 `k6/x/tcp` 扩展的 k6 构建。脚本会创建并持久化测试账号，每轮使用新的 `RUN_ID`，不要直接在生产数据上运行。默认场景按 10、25、50 VU 分阶段启动；压测记录和结果解释见 [`gateway/test/k6/baseline.md`](gateway/test/k6/baseline.md)。
+
+Heartbeat 黑盒脚本：
 
 ```bash
 go run scripts/heartbeat_blackbox.go
 ```
 
-脚本会覆盖登录、TCP auth、heartbeat、房间和聊天链路。运行前请确认服务已启动；测试账号和 Redis 数据应使用隔离的开发环境。
+该脚本覆盖登录、TCP auth、heartbeat、房间和聊天链路。运行前请确认服务已启动；测试账号和 Redis 数据应使用隔离的开发环境。
 
 ## 安全与已知限制
 

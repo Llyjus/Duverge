@@ -2,70 +2,56 @@
 
 [English](README.md) | [中文](README_ch.md)
 
-Duverge is an experimental multiplayer-game backend. It is split into a Gateway, Room, and UserData service and currently implements user registration/login, session management, room membership, ready state, game state transitions, TCP heartbeats, and room/private chat.
+Duverge is an experimental multiplayer game backend. It contains a Go Gateway, a Go Room service, a Java/Spring UserData service, Redis and MySQL. Prometheus and Grafana are included in Docker Compose for service and load-test monitoring.
 
-> The repository is under active development. The API and storage contracts below describe the current implementation, not a stable production API.
+> This project is under active development. The API, storage format and operational behavior documented here describe the current code, not a stable production contract.
+
+## Contents
+
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Monitoring](#monitoring)
+- [HTTP API](#http-api)
+- [TCP API](#tcp-api)
+- [Timeouts](#timeouts)
+- [gRPC services](#grpc-services)
+- [Storage](#storage)
+- [Password hashing limits](#password-hashing-limits)
+- [Development and tests](#development-and-tests)
+- [Security and current limitations](#security-and-current-limitations)
 
 ## Architecture
 
 ```text
-Client
-  ├── HTTP :26526 ───────┐
-  └── TCP  :26527         │
-                         ▼
-                    Gateway (Go)
-                  ┌──────┴──────┐
-                  │             │
-          gRPC :26529     gRPC :26528
-                  │             │
-              UserData       Room (Go)
-                  │             │
-                MySQL ◄──── Redis :6379
+HTTP :26526 ─┐
+TCP  :26527 ─┴─> Gateway (Go) ──gRPC──> UserData (Java) ──> MySQL
+                       │
+                       ├────gRPC────> Room (Go)
+                       └────────────> Redis <──────────────┘
+
+Prometheus ──scrapes──> Gateway :9091, Room :9091, UserData :9091
+Grafana ──────────────> Prometheus
 ```
 
-| Service | Stack | Container port | Responsibility |
-|---|---|---:|---|
-| `gateway` | Go 1.26 | `26526` HTTP, `26527` TCP | External entry point, sessions, TCP auth, heartbeat, chat, room HTTP API |
-| `userdata` | Java 25 / Spring Boot | `26529` gRPC | User registration, BCrypt password verification, login-session generation |
-| `room` | Go 1.26 | `26528` gRPC | Rooms, membership, ready state, game state |
-| `redis` | Redis | `6379` | Sessions, user status, rooms |
-| `mysql` | MySQL 8.4 | `3306` | User persistence |
+| Compose service | Technology | Ports | Responsibility |
+|---|---|---|---|
+| `gateway` | Go | HTTP `26526`, TCP `26527`, metrics `9091` (internal) | External API, sessions, TCP auth/chat/heartbeat, room HTTP routes |
+| `room` | Go | gRPC `26528`, metrics `9091` (internal) | Room membership, ready state and game state |
+| `userdata` | Java 25 / Spring Boot | gRPC `26529`, metrics `9091` (host-bound to `127.0.0.1`) | Registration, BCrypt password verification and database access |
+| `redis` | Redis | `6379` | Sessions, online user status and room state |
+| `mysql` | MySQL 8.4 | `3306` | User records |
+| `prometheus` | Prometheus | host `127.0.0.1:9090` | Scrapes and stores service metrics |
+| `grafana` | Grafana | host `127.0.0.1:3000` | Dashboards backed by Prometheus |
 | `adminer` | Adminer | `8080` | Development database UI |
 | `redisinsight` | RedisInsight | `5540` | Development Redis UI |
-| `game` | Not enabled | - | Compose entry is commented out; TCP `game` messages are currently a placeholder |
 
-Inside the Compose network, services use:
+Services use Compose DNS names internally: `gateway`, `room`, `userdata`, `redis`, and `mysql`. The optional `game` service is not enabled; TCP `game` messages remain a placeholder.
 
-```text
-redis:6379
-userdata:26529
-room:26528
-mysql:3306
-```
+## Quick start
 
-For the complete field-level API, Redis, and MySQL data dictionary, see the [Chinese API reference](README_ch.md).
+Requirements: Docker and Docker Compose. Go 1.26, JDK 25 and Maven are only needed for local development.
 
-## Repository layout
-
-```text
-Duverge/
-├── docker-compose.yml
-├── .env
-├── gateway/                 # Go external Gateway
-├── room/                    # Go Room gRPC service
-├── userData/userdata/       # Java UserData gRPC service
-├── proto/                   # Protobuf source files
-├── mysql/data/              # Development MySQL data directory
-└── scripts/                 # Black-box and utility scripts
-```
-
-## Requirements and configuration
-
-- Docker and Docker Compose
-- Git
-- Optional local development tools: Go 1.26, JDK 25, Maven
-
-Create `.env` next to `docker-compose.yml`:
+Create `.env` beside `docker-compose.yml`:
 
 ```env
 MYSQL_ROOT_PASSWORD=root
@@ -74,275 +60,252 @@ MYSQL_USER=rin
 MYSQL_PASSWORD=change-me
 ```
 
-Do not commit real credentials. `MYSQL_DATABASE`, `MYSQL_USER`, and `MYSQL_PASSWORD` are passed to MySQL and UserData by Compose.
+Use local development credentials only. Do not commit real secrets.
 
-## Run
+Start all application and monitoring services:
 
 ```bash
 docker compose up -d --build
 docker compose ps
-docker compose logs -f gateway
-docker compose down
 ```
 
-Health check:
+Check Gateway and service readiness:
 
 ```bash
 curl -i http://127.0.0.1:26526/health
-# 200 OK
-# ok
+docker compose logs -f gateway
 ```
 
-To clear the development Redis database, which deletes every key in the selected Redis database:
+Useful local URLs:
+
+- Gateway health: <http://127.0.0.1:26526/health>
+- Prometheus: <http://127.0.0.1:9090>
+- Grafana: <http://127.0.0.1:3000>
+- UserData Prometheus endpoint: <http://127.0.0.1:9091/actuator/prometheus>
+
+The first Grafana login uses the Grafana image's default `admin` / `admin` credentials unless you have changed them. Change the default password before sharing the instance. Gateway and Room metrics ports are available to Prometheus on the Compose network, but are not published on the host.
+
+Stop containers while preserving named volumes:
 
 ```bash
-docker compose exec redis redis-cli FLUSHALL
+docker compose down
 ```
+
+This project uses persistent Redis, Prometheus and Grafana volumes, and a MySQL data directory. Avoid `FLUSHALL` or volume deletion unless you intend to erase development data.
+
+## Monitoring
+
+### Collection and dashboard
+
+Prometheus configuration is in [`monitoring/prometheus.yml`](monitoring/prometheus.yml). It scrapes Gateway and Room at `/metrics` every 5 seconds and UserData at `/actuator/prometheus` every 250 ms (200 ms scrape timeout). Prometheus's UI is at <http://127.0.0.1:9090>; check **Status → Targets** and confirm the `gateway`, `room` and `userdata` targets are `UP`.
+
+Grafana is provisioned with a Prometheus datasource and loads dashboards from `monitoring/dashboards/`. Open **Dashboards → Load Tests → UserData Load Correlation**. Its source file is [`monitoring/dashboards/userdata-load-correlated.json`](monitoring/dashboards/userdata-load-correlated.json). Compose mounts the dashboard read-only, so edit the JSON and restart Grafana to apply file changes:
+
+```bash
+docker compose restart grafana
+```
+
+The correlated dashboard includes process CPU, BCrypt P50/P95/P99 and mean, UserData gRPC latency, Gateway HTTP latency, database operation latency, exported JVM/Hikari/executor data, request rates, BCrypt concurrency and waiters, peak concurrency, permit wait P95, and rejection rates.
+
+Two dashboard panels depend on metrics that are not uniformly available: the **Process CPU** panel queries Spring's `process_cpu_usage` for Gateway and Room as well as UserData, but the Go Prometheus collector exposes `process_cpu_seconds_total` instead. Therefore the UserData CPU series is the expected one in that panel; use `rate(process_cpu_seconds_total{job="gateway"}[1m])` or the equivalent `room` query for Go process CPU (CPU-seconds per second, where `1` is one fully used core). The **Container CPU throttling** panel expects cAdvisor/cgroup metrics, but the current Prometheus configuration does not scrape cAdvisor, so that panel can be empty while application targets are healthy.
+
+### Metrics and example PromQL
+
+Micrometer timer names are exported to Prometheus with `_seconds` suffixes. UserData's `job="userdata"` label comes from the Prometheus scrape configuration; BCrypt timers also have `operation="encode"` or `operation="verify"`.
+
+Current BCrypt activity by operation:
+
+```promql
+password_hash_in_flight{job="userdata",operation="encode"}
+password_hash_in_flight{job="userdata",operation="verify"}
+```
+
+Total active hashes and requests waiting for a permit:
+
+```promql
+password_hash_active{job="userdata"}
+password_hash_waiting{job="userdata"}
+```
+
+BCrypt execution P95, split by operation:
+
+```promql
+histogram_quantile(0.95,
+  sum by (le, operation) (
+    rate(userdata_password_operation_seconds_bucket{job="userdata"}[1m])
+  )
+)
+```
+
+BCrypt completions per second:
+
+```promql
+sum by (operation) (
+  rate(userdata_password_operation_seconds_count{job="userdata"}[1m])
+)
+```
+
+Permit wait P95:
+
+```promql
+histogram_quantile(0.95,
+  sum by (le) (
+    rate(userdata_password_permit_wait_seconds_bucket{job="userdata"}[1m])
+  )
+)
+```
+
+Gateway HTTP request P95 (currently instrumented for login and registration):
+
+```promql
+histogram_quantile(0.95,
+  sum by (le, operation) (
+    rate(service_operation_duration_seconds_bucket{
+      service="gateway",stage="http_total"
+    }[1m])
+  )
+)
+```
+
+Other useful UserData metrics include:
+
+| Metric | Meaning |
+|---|---|
+| `password_hash_active` | Number of encode/verify calls currently inside BCrypt |
+| `password_hash_waiting` | Number of calls currently waiting for a permit |
+| `password_hash_active_max` | Peak total BCrypt execution concurrency since process start |
+| `password_hash_in_flight{operation}` | Current BCrypt calls, split into `encode` and `verify` |
+| `password_hash_in_flight_max{operation}` | Peak BCrypt concurrency by operation since process start |
+| `userdata_password_operation_seconds_*` | Encode/verify execution timer: count, sum and histogram buckets |
+| `userdata_password_permit_wait_seconds_*` | Time spent acquiring a BCrypt permit |
+| `password_hash_permit_timeout_total` | Calls rejected after waiting for a permit timed out |
+| `password_hash_permit_queue_full_total` | Calls rejected because the configured waiting limit was full |
+| `userdata_grpc_server_requests_seconds_*` | UserData gRPC request duration |
+| `userdata_database_operation_seconds_*` | Timed UserData database operations |
+
+Peak gauges reset when UserData restarts. A short load phase may finish between Prometheus scrapes; use a longer test phase or a sufficiently short scrape interval when measuring peaks. A Prometheus `rate()` over a window is an averaged completion rate, not a single request's latency or instantaneous concurrency.
 
 ## HTTP API
 
-Gateway HTTP base URL:
-
-```text
-http://127.0.0.1:26526
-```
-
-All JSON requests use `Content-Type: application/json`.
+Base URL: `http://127.0.0.1:26526`. Send JSON requests with `Content-Type: application/json`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Returns `ok` |
+| `GET` | `/health` | Liveness response (`200 ok`) |
 | `POST` | `/login` | Register or login, selected by `type` |
 | `POST` | `/login_session` | Validate a session |
 | `POST` | `/room/user` | Create a room |
-| `POST` | `/room/room` | Get room info, join, leave, or start a game |
+| `POST` | `/room/room` | Get room info, join, leave or start a game |
 | `POST` | `/room/userPreparation` | Set or cancel ready state |
 | `POST` | `/room/endGame` | Internal game-end callback |
 
-### Register
+### Register and login
 
-```http
-POST /login
+Register:
+
+```json
+{"type":"register","accountId":"alice","password":"secret"}
+```
+
+Login:
+
+```json
+{"type":"login","accountId":"alice","password":"secret"}
+```
+
+Successful login returns an opaque session ID:
+
+```json
+{"success":true,"sessionId":"<opaque-session-id>"}
+```
+
+### Validate session
+
+```json
+{"sessionId":"<opaque-session-id>"}
+```
+
+A valid session returns `{"success":true}`. A missing or expired session returns `401`; Redis/session storage errors return `503 Session service unavailable`.
+
+### Room routes
+
+Create a room:
+
+```json
+{"type":"createRoom","sessionId":"<session-id>"}
 ```
 
 ```json
-{
-  "type": "register",
-  "accountId": "alice",
-  "password": "secret"
-}
-```
-
-Success:
-
-```json
-{"success": true}
-```
-
-### Login
-
-```http
-POST /login
-```
-
-```json
-{
-  "type": "login",
-  "accountId": "alice",
-  "password": "secret"
-}
-```
-
-Success:
-
-```json
-{
-  "success": true,
-  "sessionId": "<opaque-session-id>"
-}
-```
-
-### Validate a session
-
-```http
-POST /login_session
-```
-
-```json
-{"sessionId": "<opaque-session-id>"}
-```
-
-Success:
-
-```json
-{"success": true}
-```
-
-Errors: `400` for malformed JSON, `401` when the session is missing or expired, and `503` when Redis/session storage is unavailable.
-
-### Room operations
-
-Create:
-
-```json
-{"type": "createRoom", "sessionId": "<session-id>"}
-```
-
-```json
-{"roomId": "12345"}
+{"roomId":"12345"}
 ```
 
 Get members:
 
 ```json
-{
-  "type": "getRoomInfo",
-  "sessionId": "<session-id>",
-  "roomId": "12345"
-}
+{"type":"getRoomInfo","sessionId":"<session-id>","roomId":"12345"}
 ```
+
+The response currently uses the legacy field `roomId` for the user ID array:
 
 ```json
-{"success": true, "roomId": ["alice", "bob"]}
+{"success":true,"roomId":["alice","bob"]}
 ```
 
-> The current response uses `roomId` for the user-ID array. This is a legacy field name; `userIds` would be clearer.
+Join, leave and start operations use `type` values `joinRoom`, `leaveRoom` and `startGame`, with `sessionId` and `roomId`; successful operations return `{"result":true}`. A room has a maximum size of four. Starting requires the host, at least two players, a waiting room and all members prepared.
 
-Join, leave, and start:
+Set ready state:
 
 ```json
-{
-  "type": "joinRoom",
-  "sessionId": "<session-id>",
-  "roomId": "12345"
-}
+{"type":"setPreparation","sessionId":"<session-id>","roomId":"12345","targetStatus":true}
 ```
 
-```json
-{"result": true}
-```
-
-Use `leaveRoom` or `startGame` as the `type` for the other operations. A room has a maximum size of 4. Starting requires the host, at least two players, a waiting room, and every member prepared.
-
-Set ready:
-
-```json
-{
-  "type": "setPreparation",
-  "sessionId": "<session-id>",
-  "roomId": "12345",
-  "targetStatus": true
-}
-```
-
-```json
-{"status": true}
-```
+The response is `{"status":true}` or `{"status":false}`.
 
 End-game callback:
 
 ```json
-{
-  "type": "endGame",
-  "roomId": "12345"
-}
+{"type":"endGame","roomId":"12345"}
 ```
 
-This endpoint is intended for an internal game service and currently has no service authentication.
+This callback has no service authentication and should not be exposed to untrusted clients.
 
 ## TCP API
 
-Gateway TCP address: `127.0.0.1:26527`.
+Gateway listens on `127.0.0.1:26527`. Each message is framed as `[4-byte big-endian body length][JSON body]`; body size must be from 1 byte through 64 KiB. Protocol version is `"1.0"`.
 
-Each message is framed as:
-
-```text
-[4-byte big-endian body length][JSON body]
-```
-
-The body must be between 1 byte and 64 KiB. Every message uses protocol version `"1.0"`:
+Authenticate first with the session ID:
 
 ```json
-{
-  "version": "1.0",
-  "request_id": "req-001",
-  "type": "heartbeat",
-  "data": null
-}
-```
-
-Authenticate with a login session:
-
-```json
-{
-  "version": "1.0",
-  "request_id": "auth-001",
-  "type": "auth",
-  "data": {"token": "<session-id>"}
-}
+{"version":"1.0","request_id":"auth-001","type":"auth","data":{"token":"<session-id>"}}
 ```
 
 Heartbeat:
 
 ```json
-{
-  "version": "1.0",
-  "request_id": "hb-001",
-  "type": "heartbeat",
-  "data": null
-}
+{"version":"1.0","request_id":"hb-001","type":"heartbeat","data":null}
 ```
 
-Heartbeat renews the `user_status:<userId>` TTL to 30 seconds; it does not change the status value. Clients should send it before expiry, preferably every 10 seconds.
+Heartbeat renews `user_status:<userId>` to a 30-second TTL. Send it before expiry; every 10 seconds is the current recommendation.
 
-Room chat:
+Room chat uses `type: "room"` and a `room_id`; private chat uses `type: "private"` and a recipient user ID. Chat is delivered only to online TCP connections and is not persisted.
 
-```json
-{
-  "version": "1.0",
-  "request_id": "chat-001",
-  "type": "chat",
-  "data": {
-    "type": "room",
-    "data": {
-      "room_id": "12345",
-      "type": "text",
-      "content": "hello room"
-    }
-  }
-}
-```
+TCP error codes include `INVALID_MESSAGE`, `UNAUTHENTICATED`, `AUTHENTICATION_FAILED`, `FORBIDDEN`, `NOT_FOUND`, `VERSION_MISMATCH`, `INTERNAL_ERROR` and `SERVER_CLOSED_ERROR`.
 
-Private chat uses `"type": "private"` and an inner `"to"` user ID. Chat is currently delivered only to online TCP connections and is not persisted.
+## Timeouts
 
-TCP error codes currently include:
+HTTP routes share `GATEWAY_REQUEST_TIMEOUT` (default `10s`) through `http.TimeoutHandler`. Its request context is passed to downstream gRPC and Redis calls. Expired HTTP requests return `503 Request timed out`.
 
-| Code | Meaning |
-|---|---|
-| `INVALID_MESSAGE` | Invalid JSON, unsupported type, or invalid chat fields |
-| `UNAUTHENTICATED` | Non-auth message before authentication |
-| `AUTHENTICATION_FAILED` | Invalid or expired login session |
-| `FORBIDDEN` | Repeated authentication |
-| `NOT_FOUND` | Missing room or offline private-chat target |
-| `VERSION_MISMATCH` | Unsupported protocol version |
-| `INTERNAL_ERROR` | Redis, network, or unclassified service error |
-| `SERVER_CLOSED_ERROR` | EOF or unexpected connection close |
+TCP has separate authentication, idle-read, operation and write deadlines. Override values in the root `.env`; values must be positive Go durations such as `5s` or `1m`.
 
-## Gateway timeouts
-
-Gateway wraps HTTP routes with a shared `http.TimeoutHandler` deadline. The request context carries the remaining budget into UserData/Room gRPC calls and Redis operations. An expired HTTP request returns `503 Request timed out`. If Redis/session storage is unavailable, `POST /login_session` returns `503 Session service unavailable`; a missing or expired session remains `401`.
-
-TCP connections have separate limits for authentication, idle reads, operation contexts, and writes. Values use positive Go duration syntax such as `5s` or `1m`; invalid values prevent Gateway from starting.
-
-| Environment variable | Default | Purpose |
+| Environment variable | Default | Meaning |
 |---|---:|---|
 | `GATEWAY_REQUEST_TIMEOUT` | `10s` | Total budget for one HTTP request |
-| `GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT` | `10s` | Time allowed to authenticate after TCP connect |
-| `GATEWAY_TCP_IDLE_TIMEOUT` | `45s` | Maximum idle interval between TCP messages |
-| `GATEWAY_TCP_OPERATION_TIMEOUT` | `5s` | Context deadline for TCP auth, chat, heartbeat, and related operations |
+| `GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT` | `10s` | Time to authenticate after TCP connect |
+| `GATEWAY_TCP_IDLE_TIMEOUT` | `45s` | Maximum idle time between TCP messages |
+| `GATEWAY_TCP_OPERATION_TIMEOUT` | `5s` | Deadline for auth, chat, heartbeat and other TCP operations |
 | `GATEWAY_TCP_WRITE_TIMEOUT` | `10s` | Deadline for each TCP write |
 
-Docker Compose uses these defaults. Override them in the project-root `.env`, for example:
+Example override:
 
 ```env
 GATEWAY_REQUEST_TIMEOUT=8s
@@ -352,137 +315,75 @@ GATEWAY_TCP_OPERATION_TIMEOUT=4s
 GATEWAY_TCP_WRITE_TIMEOUT=5s
 ```
 
-Apply changes by recreating Gateway:
+Recreate Gateway to apply changes:
 
 ```bash
 docker compose up -d --build gateway
 ```
 
-## Internal gRPC APIs
+## gRPC services
 
-### UserData service
+Gateway connects to UserData at `userdata:26529` and Room at `room:26528` inside Compose.
 
-Source: [`proto/user_info/login.proto`](proto/user_info/login.proto)
-Address: `userdata:26529`
+UserData RPCs are `UserRegistration` and `UserLogin`, defined in [`proto/user_info/login.proto`](proto/user_info/login.proto). Room RPCs are `GetRoomInfo`, `CreateRoom`, `JoinRoom`, `LeaveRoom`, `SetPreparation`, `StartGame` and `EndGame`, defined in [`proto/room/room_4_gateway.proto`](proto/room/room_4_gateway.proto).
 
-```protobuf
-service UserDataService {
-  rpc UserRegistration(UserRegistrationRequest)
-      returns (UserRegistrationResponse);
-  rpc UserLogin(UserLoginRequest)
-      returns (UserLoginResponse);
-}
-```
+## Storage
 
-`UserRegistration` creates a user and returns `result`. `UserLogin` verifies the BCrypt password and returns `result` plus a random Base64URL session ID.
+### Redis
 
-### Room service
+| Key | Value | TTL |
+|---|---|---:|
+| `session:<sessionId>` | `session_account:<accountId>` | 7 days |
+| `session_account:<accountId>` | `session:<sessionId>` | 7 days |
+| `user_status:<userId>` | User ID and status JSON | Initially 30 seconds; heartbeat renews it |
+| `room:<roomId>` | Room JSON | No expiration; deleted when the room becomes empty |
 
-Source: [`proto/room/room_4_gateway.proto`](proto/room/room_4_gateway.proto)
-Address: `room:26528`
+User statuses include `in_lobby`, `in_room` and `in_game`. Room statuses include `waiting`, `in_game` and `finished`.
 
-RPCs:
+### MySQL
 
-```text
-GetRoomInfo
-CreateRoom
-JoinRoom
-LeaveRoom
-SetPreparation
-StartGame
-EndGame
-```
+The `users` table stores an auto-increment ID, unique account ID and BCrypt password hash. JPA currently uses `ddl-auto: update` for development; production should use managed schema migrations. UserData uses `MYSQL_DATABASE`, `MYSQL_USER` and `MYSQL_PASSWORD` from Compose.
 
-## Redis data dictionary
+## Password hashing limits
 
-### Sessions
+UserData routes both BCrypt `encode()` (registration) and `matches()` (login) through one fair semaphore. Compose defaults are:
 
-| Key | Type | TTL | Value |
-|---|---|---:|---|
-| `session:<sessionId>` | String | 7 days | `session_account:<accountId>` |
-| `session_account:<accountId>` | String | 7 days | `session:<sessionId>` |
+| Environment variable | Default | Meaning |
+|---|---:|---|
+| `USERDATA_PASSWORD_HASH_MAX_CONCURRENCY` | `10` | Simultaneous BCrypt executions; `0` disables the execution limit |
+| `USERDATA_PASSWORD_HASH_ACQUIRE_TIMEOUT` | `5s` | Maximum time waiting for an execution permit |
+| `USERDATA_PASSWORD_HASH_MAX_WAITERS` | `100` | Maximum queued waiters; `0` rejects immediately when no permit is available |
 
-The two keys are a reverse index. A new login removes the previous session for that account.
+When all permits are occupied and the waiter limit is reached or its timeout expires, the request fails explicitly; it is not silently treated as a bad password or successful registration. These settings are useful for controlled performance experiments and should be evaluated alongside BCrypt latency, permit wait, throughput, CPU and rejection metrics.
 
-### User status
+## Development and tests
 
-Key: `user_status:<userId>`
-Type: JSON string
-Initial TTL: 30 seconds
-Heartbeat: resets TTL to 30 seconds
-
-```json
-{
-  "user_id": "alice",
-  "status": "in_lobby"
-}
-```
-
-Statuses are `in_lobby`, `in_room`, and `in_game`. Room operations may rewrite the key with no expiration.
-
-### Rooms
-
-Key: `room:<roomId>`
-Type: JSON string
-TTL: none
-
-```json
-{
-  "roomId": "12345",
-  "maximumSize": 4,
-  "userIds": ["alice", "bob"],
-  "hosterId": "alice",
-  "prepared": ["alice"],
-  "status": "waiting"
-}
-```
-
-Room statuses are `waiting`, `in_game`, and `finished`. Empty rooms are deleted.
-
-## MySQL data dictionary
-
-Database: `${MYSQL_DATABASE}`, normally `user_data`.
-
-Table: `users`
-
-| Column | Meaning |
-|---|---|
-| `id` | Auto-increment primary key |
-| `account_id` | Login account |
-| `password` | BCrypt password hash |
-
-JPA currently uses `ddl-auto: update` for development. UserData exposes registration and login through gRPC only.
-
-## State model
-
-```text
-in_lobby ── joinRoom ──► in_room ── startGame ──► in_game
-   ▲                         │                      │
-   └──────── leaveRoom ◄─────┘                      │
-                         endGame ◄─────────────────┘
-```
-
-## Development and testing
+Go services are separate modules:
 
 ```bash
-cd gateway && go test ./...
-cd ../room && go test ./...
+(cd gateway && go test ./...)
+(cd room && go test ./...)
+```
+
+Gateway resilience tests live under `gateway/test/resiliencetest`. Some Room Redis integration tests require a local Redis and an explicit `RESILIENCE_REDIS_ADDR`; see the test source before running them. The `gateway/test/k6/benchmark.js` script requires a k6 build that includes the `k6/x/tcp` extension. It creates persistent test accounts; use a fresh `RUN_ID` for each run and clean only the generated test data afterward.
+
+The heartbeat black-box script is:
+
+```bash
 go run scripts/heartbeat_blackbox.go
 ```
 
-The black-box flow exercises login, TCP authentication, periodic heartbeat, room presence, room chat, and private chat. Run it only against an isolated development stack.
+Run black-box and load tests only against an isolated development stack. The K6 script's full default scenario ramps through 10, 25 and 50 VUs; it can be shortened with its environment variables such as `ITERATIONS` and scenario start times. See [`gateway/test/k6/baseline.md`](gateway/test/k6/baseline.md) for recorded run conditions and interpretation notes.
 
-## Security and known limitations
+## Security and current limitations
 
-- Redis has no password or TLS in the default Compose setup.
-- HTTP and gRPC are not configured with TLS.
+- The default Compose Redis has no password or TLS; HTTP and gRPC have no TLS/service authentication.
 - `/room/endGame` has no internal authentication.
-- Online TCP connections are kept in one Gateway process's memory and are not shared across replicas.
+- TCP connection state is held in one Gateway process's memory and is not shared across replicas.
 - Chat is not persisted.
-- Room keys have no expiration until an empty room is deleted.
-- Production deployments should use schema migrations instead of `ddl-auto: update`.
-- Add input-length validation, rate limiting, session revocation, replay protection, and fine-grained authorization before production use.
-- The Game service is not enabled; TCP `game` is currently a placeholder.
+- The `game` service is disabled and its TCP message is a placeholder.
+- Add request size and field validation, rate limiting, session revocation and fine-grained authorization before production use.
+- Metrics and dashboards are configured for local development/load testing. cAdvisor/container throttling metrics are not currently scraped.
 
 ## License
 
