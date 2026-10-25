@@ -178,6 +178,8 @@ Success:
 {"success": true}
 ```
 
+Errors: `400` for malformed JSON, `401` when the session is missing or expired, and `503` when Redis/session storage is unavailable.
+
 ### Room operations
 
 Create:
@@ -325,6 +327,36 @@ TCP error codes currently include:
 | `VERSION_MISMATCH` | Unsupported protocol version |
 | `INTERNAL_ERROR` | Redis, network, or unclassified service error |
 | `SERVER_CLOSED_ERROR` | EOF or unexpected connection close |
+
+## Gateway timeouts
+
+Gateway wraps HTTP routes with a shared `http.TimeoutHandler` deadline. The request context carries the remaining budget into UserData/Room gRPC calls and Redis operations. An expired HTTP request returns `503 Request timed out`. If Redis/session storage is unavailable, `POST /login_session` returns `503 Session service unavailable`; a missing or expired session remains `401`.
+
+TCP connections have separate limits for authentication, idle reads, operation contexts, and writes. Values use positive Go duration syntax such as `5s` or `1m`; invalid values prevent Gateway from starting.
+
+| Environment variable | Default | Purpose |
+|---|---:|---|
+| `GATEWAY_REQUEST_TIMEOUT` | `10s` | Total budget for one HTTP request |
+| `GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT` | `10s` | Time allowed to authenticate after TCP connect |
+| `GATEWAY_TCP_IDLE_TIMEOUT` | `45s` | Maximum idle interval between TCP messages |
+| `GATEWAY_TCP_OPERATION_TIMEOUT` | `5s` | Context deadline for TCP auth, chat, heartbeat, and related operations |
+| `GATEWAY_TCP_WRITE_TIMEOUT` | `10s` | Deadline for each TCP write |
+
+Docker Compose uses these defaults. Override them in the project-root `.env`, for example:
+
+```env
+GATEWAY_REQUEST_TIMEOUT=8s
+GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT=12s
+GATEWAY_TCP_IDLE_TIMEOUT=60s
+GATEWAY_TCP_OPERATION_TIMEOUT=4s
+GATEWAY_TCP_WRITE_TIMEOUT=5s
+```
+
+Apply changes by recreating Gateway:
+
+```bash
+docker compose up -d --build gateway
+```
 
 ## Internal gRPC APIs
 

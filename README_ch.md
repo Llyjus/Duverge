@@ -12,6 +12,7 @@ Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Ga
 - [运行环境与启动](#运行环境与启动)
 - [HTTP API](#http-api)
 - [TCP 协议](#tcp-协议)
+- [Gateway 超时设置](#gateway-超时设置)
 - [内部 gRPC API](#内部-grpc-api)
 - [Redis 数据字典](#redis-数据字典)
 - [MySQL 数据字典](#mysql-数据字典)
@@ -250,6 +251,7 @@ ok
 |---|---|
 | `400` | JSON 非法 |
 | `401` | session 不存在、为空或已过期 |
+| `503` | Redis/session 存储不可用，服务暂时无法校验 session |
 
 ### `POST /room/user`
 
@@ -579,6 +581,36 @@ Gateway 会读取 `room:<roomId>` 的 `userIds`，向当前在线成员发送：
 | `SERVER_CLOSED_ERROR` | 连接已关闭 | EOF/UnexpectedEOF |
 
 认证失败和版本错误返回错误后会关闭 TCP 连接；普通业务错误通常保持连接。
+
+## Gateway 超时设置
+
+Gateway 的 HTTP 路由通过 `http.TimeoutHandler` 使用统一请求超时。该 deadline 会随请求 context 传入 UserData/Room gRPC 调用和 Redis 操作；请求超过预算时返回 HTTP `503`、`Request timed out`。Redis/session 存储自身不可用时，`POST /login_session` 返回 HTTP `503`、`Session service unavailable`；无效或过期 session 仍返回 HTTP `401`。
+
+TCP 连接分别设置认证前等待、空闲读取、单次操作和写入超时。超时配置必须是正数 Go duration（例如 `3s`、`1m`）；无效配置会阻止 Gateway 启动。
+
+| 环境变量 | 默认值 | 作用 |
+|---|---:|---|
+| `GATEWAY_REQUEST_TIMEOUT` | `10s` | 每个 HTTP 请求的总预算 |
+| `GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT` | `10s` | TCP 建连后完成认证的最长时间 |
+| `GATEWAY_TCP_IDLE_TIMEOUT` | `45s` | 两次 TCP 消息读取之间允许的最长空闲时间 |
+| `GATEWAY_TCP_OPERATION_TIMEOUT` | `5s` | TCP auth、chat、heartbeat 等操作的 context deadline |
+| `GATEWAY_TCP_WRITE_TIMEOUT` | `10s` | 单次 TCP 写入的 deadline |
+
+Docker Compose 默认使用上述值。可在项目根目录 `.env` 覆盖，例如：
+
+```env
+GATEWAY_REQUEST_TIMEOUT=8s
+GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT=12s
+GATEWAY_TCP_IDLE_TIMEOUT=60s
+GATEWAY_TCP_OPERATION_TIMEOUT=4s
+GATEWAY_TCP_WRITE_TIMEOUT=5s
+```
+
+修改后重建 Gateway：
+
+```bash
+docker compose up -d --build gateway
+```
 
 ## 内部 gRPC API
 
