@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -19,12 +20,21 @@ func HandleConnection(
 	session *connection.Session,
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
+	timeouts connection.Timeouts,
 ) {
-	ctx := context.Background()
 	defer session.Close()
+	unauthenticatedDeadline := time.Now().Add(timeouts.Unauthenticated)
 
 	for {
-		// read the first message from the connection
+		readDeadline := time.Now().Add(timeouts.Idle)
+		if !session.AuthStatus && unauthenticatedDeadline.Before(readDeadline) {
+			readDeadline = unauthenticatedDeadline
+		}
+		if err := session.Conn.SetReadDeadline(readDeadline); err != nil {
+			log.Printf("[TCP] failed to set read deadline: %v", err)
+			return
+		}
+
 		body, err := connection.ReadMessage(session.Conn)
 		if err != nil {
 			log.Printf("[TCP] failed to read message: %v\n", err)
@@ -39,7 +49,7 @@ func HandleConnection(
 				return
 			}
 
-			if writeErr := connection.WriteMessage(session.Conn, closeMessage); writeErr != nil {
+			if writeErr := session.WriteMessage(closeMessage); writeErr != nil {
 				log.Printf("[TCP] failed to send close message: %v\n", writeErr)
 			}
 			return
@@ -58,7 +68,7 @@ func HandleConnection(
 				log.Printf("[TCP] failed to capsulate invalid message response: %v\n", err)
 				return
 			}
-			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+			if writeErr := session.WriteMessage(responseData); writeErr != nil {
 				log.Printf("[TCP] failed to send invalid message response: %v\n", writeErr)
 				return
 			}
@@ -77,7 +87,7 @@ func HandleConnection(
 				log.Printf("[TCP] failed to capsulate version mismatch response: %v\n", err)
 				return
 			}
-			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+			if writeErr := session.WriteMessage(responseData); writeErr != nil {
 				log.Printf("[TCP] failed to send version mismatch response: %v\n", writeErr)
 			}
 			return
@@ -94,20 +104,24 @@ func HandleConnection(
 					log.Printf("[TCP] failed to capsulate unauthenticated error response: %v\n", err)
 					return
 				}
-				if writeErr := connection.WriteMessage(session.Conn, ErrorResponseData); writeErr != nil {
+				if writeErr := session.WriteMessage(ErrorResponseData); writeErr != nil {
 					log.Printf("[TCP] failed to send unauthenticated error response: %v\n", writeErr)
 					return
 				}
 				continue
 			}
 
-			if err := auth.Authenticate(
+			opCtx, cancel := context.WithTimeout(context.Background(), timeouts.Operation)
+			authErr := auth.Authenticate(
 				session,
 				manager,
 				redisClient,
-				ctx,
+				opCtx,
 				msg.Data,
-			); err != nil {
+			)
+			cancel()
+			if authErr != nil {
+				err := authErr
 				log.Printf("[TCP] authentication failed: %v\n", err)
 				errorCode, detail := mapAuthError(err)
 				errorResponseData, responseErr := protocol.CapsulateErrorResponse(
@@ -118,7 +132,7 @@ func HandleConnection(
 					log.Printf("[TCP] failed to capsulate authentication error response: %v\n", responseErr)
 					return
 				}
-				if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+				if writeErr := session.WriteMessage(errorResponseData); writeErr != nil {
 					log.Printf("[TCP] failed to send authentication error response: %v\n", writeErr)
 				}
 				return
@@ -131,7 +145,7 @@ func HandleConnection(
 				return
 			}
 
-			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+			if writeErr := session.WriteMessage(responseData); writeErr != nil {
 				log.Printf("[TCP] failed to send chat response: %v\n", writeErr)
 				return
 			}
@@ -153,7 +167,7 @@ func HandleConnection(
 				log.Printf("[TCP] failed to capsulate auth error response: %v\n", err)
 				return
 			}
-			if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+			if writeErr := session.WriteMessage(errorResponseData); writeErr != nil {
 				log.Printf("[TCP] failed to send auth error response: %v\n", writeErr)
 				return
 			}
@@ -162,12 +176,15 @@ func HandleConnection(
 
 			log.Printf("[TCP] received chat message from %s\n", session.UserID)
 
+			opCtx, cancel := context.WithTimeout(context.Background(), timeouts.Operation)
 			err := chat.HandleChat(
 				session.UserID,
 				manager,
 				redisClient,
+				opCtx,
 				msg.Data,
 			)
+			cancel()
 
 			// error handling for chat message
 			if err != nil {
@@ -185,7 +202,7 @@ func HandleConnection(
 					return
 				}
 
-				if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+				if writeErr := session.WriteMessage(errorResponseData); writeErr != nil {
 					fmt.Printf("[TCP] failed to send error response: %v\n", writeErr)
 					return
 				}
@@ -201,7 +218,7 @@ func HandleConnection(
 				return
 			}
 
-			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+			if writeErr := session.WriteMessage(responseData); writeErr != nil {
 				log.Printf("[TCP] failed to send chat response: %v\n", writeErr)
 				return
 			}
@@ -210,11 +227,13 @@ func HandleConnection(
 
 			log.Printf("[TCP] received heartbeat from %s\n", session.UserID)
 
+			opCtx, cancel := context.WithTimeout(context.Background(), timeouts.Operation)
 			err := heartbeat.HandleHeartbeat(
 				session,
 				redisClient,
-				ctx,
+				opCtx,
 			)
+			cancel()
 			// error handling for heartbeat message
 			if err != nil {
 				log.Printf("[TCP] failed to handle heartbeat message: %v\n", err)
@@ -228,7 +247,7 @@ func HandleConnection(
 					return
 				}
 
-				if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+				if writeErr := session.WriteMessage(errorResponseData); writeErr != nil {
 					log.Printf("[TCP] failed to send error response: %v\n", writeErr)
 					return
 				}
@@ -244,7 +263,7 @@ func HandleConnection(
 				return
 			}
 
-			if writeErr := connection.WriteMessage(session.Conn, responseData); writeErr != nil {
+			if writeErr := session.WriteMessage(responseData); writeErr != nil {
 				log.Printf("[TCP] failed to send heartbeat response: %v\n", writeErr)
 				return
 			}
@@ -263,7 +282,7 @@ func HandleConnection(
 				log.Printf("[TCP] failed to capsulate type error response: %v\n", err)
 				return
 			}
-			if writeErr := connection.WriteMessage(session.Conn, errorResponseData); writeErr != nil {
+			if writeErr := session.WriteMessage(errorResponseData); writeErr != nil {
 				log.Printf("[TCP] failed to send type error response: %v\n", writeErr)
 				return
 			}

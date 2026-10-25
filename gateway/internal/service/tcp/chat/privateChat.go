@@ -39,7 +39,7 @@ func privateChat(
 	}
 
 	// send the message to the target user
-	err = connection.WriteMessage(session.Conn, chatPostBytes)
+	err = session.WriteMessage(chatPostBytes)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"io"
+	"net"
 
 	"gateway/internal/service/tcp/protocol"
 )
@@ -45,6 +46,10 @@ func mapAuthError(err error) (string, string) {
 func mapConnectionError(err error) (string, string) {
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return protocol.ErrCodeServerClosed, "连接已关闭"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return protocol.ErrCodeServerClosed, "连接超时"
 	}
 	return protocol.ErrCodeInternal, "服务器连接错误，请稍后重试"
 }

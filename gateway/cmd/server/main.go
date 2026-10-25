@@ -21,6 +21,7 @@ import (
 func main() {
 	fmt.Println("Gateway is running on port 26526 and 26527...")
 
+	// Set the request timeout for HTTP requests, defaulting to 10 seconds if not specified in the environment variable
 	requestTimeout := 10 * time.Second
 	if configured := os.Getenv("GATEWAY_REQUEST_TIMEOUT"); configured != "" {
 		parsed, err := time.ParseDuration(configured)
@@ -29,6 +30,13 @@ func main() {
 			return
 		}
 		requestTimeout = parsed
+	}
+
+	// Load TCP timeouts from environment variables
+	tcpTimeouts, err := loadTCPTimeouts()
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
 	quit := make(chan os.Signal, 1)
@@ -76,8 +84,46 @@ func main() {
 	manager := connection.NewConnectionManager()
 
 	// Start the TCP server
-	server.TcpServer(manager, redisClient)
+	server.TcpServer(manager, redisClient, tcpTimeouts)
 
 	<-quit
 	fmt.Println("Shutting down server...")
+}
+
+func loadTCPTimeouts() (connection.Timeouts, error) {
+	unauthenticated, err := durationFromEnv("GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return connection.Timeouts{}, err
+	}
+	idle, err := durationFromEnv("GATEWAY_TCP_IDLE_TIMEOUT", 45*time.Second)
+	if err != nil {
+		return connection.Timeouts{}, err
+	}
+	operation, err := durationFromEnv("GATEWAY_TCP_OPERATION_TIMEOUT", 5*time.Second)
+	if err != nil {
+		return connection.Timeouts{}, err
+	}
+	write, err := durationFromEnv("GATEWAY_TCP_WRITE_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return connection.Timeouts{}, err
+	}
+
+	return connection.Timeouts{
+		Unauthenticated: unauthenticated,
+		Idle:            idle,
+		Operation:       operation,
+		Write:           write,
+	}, nil
+}
+
+func durationFromEnv(name string, fallback time.Duration) (time.Duration, error) {
+	configured := os.Getenv(name)
+	if configured == "" {
+		return fallback, nil
+	}
+	duration, err := time.ParseDuration(configured)
+	if err != nil || duration <= 0 {
+		return 0, fmt.Errorf("invalid %s %q: expected a positive duration", name, configured)
+	}
+	return duration, nil
 }

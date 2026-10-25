@@ -13,6 +13,7 @@ import (
 func TcpServer(
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
+	timeouts connection.Timeouts,
 ) {
 	tcpListener, err := net.Listen("tcp", ":26527")
 	if err != nil {
@@ -29,12 +30,13 @@ func TcpServer(
 			continue
 		}
 
-		session := connection.NewSession(conn)
+		session := connection.NewSession(conn, timeouts.Write)
 
 		go handler.HandleConnection(
 			session,
 			manager,
 			redisClient,
+			timeouts,
 		)
 	}
 }

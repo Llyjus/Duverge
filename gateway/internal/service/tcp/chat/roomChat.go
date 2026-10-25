@@ -18,12 +18,12 @@ import (
 func roomChat(
 	redisClient *redis.Client,
 	manager *connection.ConnectionManager,
+	ctx context.Context,
 	roomID string,
 	userID string,
 	message_type string,
 	content string,
 ) error {
-	ctx := context.Background()
 
 	// get the room members
 	getRoomMembers, err := getRoomMembers(
@@ -57,7 +57,7 @@ func roomChat(
 			return err
 		}
 
-		err = connection.WriteMessage(session.Conn, chatPostBytes)
+		err = session.WriteMessage(chatPostBytes)
 		if err != nil {
 			return err
 		}

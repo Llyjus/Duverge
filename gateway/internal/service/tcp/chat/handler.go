@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -14,6 +15,7 @@ func HandleChat(
 	userID string,
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
+	ctx context.Context,
 	data []byte,
 ) error {
 	var msg protocol.ChatMessage
@@ -53,6 +55,7 @@ func HandleChat(
 		return roomChat(
 			redisClient,
 			manager,
+			ctx,
 			roomMsg.RoomID,
 			userID,
 			roomMsg.Type,
