@@ -14,6 +14,7 @@ services:
       - game-net
     environment:
       - REDIS_ADDR=redis:6379
+      - GATEWAY_REQUEST_TIMEOUT=${GATEWAY_REQUEST_TIMEOUT:-10s}
 
   # game:
   #   build: ./game

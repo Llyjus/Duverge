@@ -6,17 +6,19 @@ import (
 	"gateway/internal/client/userdata"
 	"gateway/internal/router"
 	"net/http"
+	"time"
 
 	redis "github.com/redis/go-redis/v9"
 )
 
 func HttpServer(userDataClient *userdata.Client,
 	redisClient *redis.Client,
-	roomClient *room.Client) {
+	roomClient *room.Client,
+	requestTimeout time.Duration) {
 	// HTTP server transferred from nginx
 	httpServer := &http.Server{
 		Addr:    "0.0.0.0:26526",
-		Handler: router.NewHTTPRouter(userDataClient, redisClient, roomClient),
+		Handler: router.NewHTTPRouter(userDataClient, redisClient, roomClient, requestTimeout),
 	}
 
 	go func() {

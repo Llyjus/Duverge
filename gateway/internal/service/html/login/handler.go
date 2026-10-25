@@ -1,7 +1,9 @@
 package login
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"gateway/internal/client/userdata"
 	"gateway/internal/metrics"
@@ -10,6 +12,8 @@ import (
 	"time"
 
 	redis "github.com/redis/go-redis/v9"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) http.HandlerFunc {
@@ -38,7 +42,6 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 		if req.Type == "login" || req.Type == "register" {
 			operation = req.Type
 		}
-
 		switch req.Type {
 
 		case "login":
@@ -46,6 +49,10 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			res, err = login(userDataClient, redisClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
+				if isRequestTimeout(err) {
+					http.Error(w, "Request timed out", http.StatusServiceUnavailable)
+					return
+				}
 				http.Error(w, "Error occurred while logging in", http.StatusInternalServerError)
 				return
 			}
@@ -69,6 +76,10 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			res, err = register(userDataClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
+				if isRequestTimeout(err) {
+					http.Error(w, "Request timed out", http.StatusServiceUnavailable)
+					return
+				}
 				http.Error(
 					w,
 					"Error occurred while registering",
@@ -92,4 +103,8 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			http.Error(w, "Invalid request type", http.StatusBadRequest)
 		}
 	}
+}
+
+func isRequestTimeout(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded
 }

@@ -11,6 +11,7 @@ import (
 	prep "gateway/internal/service/html/room/userPreparation"
 	"gateway/internal/service/html/sessionLogin"
 	"net/http"
+	"time"
 
 	redis "github.com/redis/go-redis/v9"
 )
@@ -18,6 +19,7 @@ import (
 func NewHTTPRouter(userDataClient *userdata.Client,
 	redisClient *redis.Client,
 	roomClient *room.Client,
+	requestTimeout time.Duration,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -37,5 +39,5 @@ func NewHTTPRouter(userDataClient *userdata.Client,
 
 	// getRoomInfo, joinRoom, leaveRoom, startGame
 	mux.HandleFunc("/room/room", rm.HandleRoom(roomClient, redisClient))
-	return mux
+	return http.TimeoutHandler(mux, requestTimeout, "Request timed out\n")
 }

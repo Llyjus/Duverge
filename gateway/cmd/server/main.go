@@ -13,12 +13,23 @@ import (
 	"syscall"
 
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
 	fmt.Println("Gateway is running on port 26526 and 26527...")
+
+	requestTimeout := 10 * time.Second
+	if configured := os.Getenv("GATEWAY_REQUEST_TIMEOUT"); configured != "" {
+		parsed, err := time.ParseDuration(configured)
+		if err != nil || parsed <= 0 {
+			fmt.Printf("Invalid GATEWAY_REQUEST_TIMEOUT %q: expected a positive duration\n", configured)
+			return
+		}
+		requestTimeout = parsed
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -61,7 +72,7 @@ func main() {
 	defer roomClient.Close()
 
 	// Start the HTTP server
-	server.HttpServer(userDataClient, redisClient, roomClient)
+	server.HttpServer(userDataClient, redisClient, roomClient, requestTimeout)
 	manager := connection.NewConnectionManager()
 
 	// Start the TCP server

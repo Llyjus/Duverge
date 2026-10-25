@@ -10,6 +10,7 @@ import (
 
 // session creation and authentication functions
 func SessionCreation(
+	ctx context.Context,
 	redisClient *redis.Client,
 	sessionID string,
 	accountID string,
@@ -17,15 +18,15 @@ func SessionCreation(
 
 	// Check if the session already exists
 	accountID = "session_account:" + accountID
-	session, err := redisClient.Get(context.Background(), accountID).Result()
+	session, err := redisClient.Get(ctx, accountID).Result()
 	if err != redis.Nil && err != nil {
 		return "", err
 	}
 
 	if session != "" {
 		// Delete the existing session and account ID from Redis
-		err = redisClient.Del(context.Background(), session).Err()
-		err = redisClient.Del(context.Background(), accountID).Err()
+		err = redisClient.Del(ctx, session).Err()
+		err = redisClient.Del(ctx, accountID).Err()
 		if err != nil {
 			return "", err
 		}
@@ -36,7 +37,7 @@ func SessionCreation(
 
 	// set the session ID and account ID in Redis with an expiration time of 7 days
 	err = redisClient.Set(
-		context.Background(),
+		ctx,
 		sessionID,
 		accountID,
 		7*24*time.Hour,
@@ -47,7 +48,7 @@ func SessionCreation(
 	}
 
 	err = redisClient.Set(
-		context.Background(),
+		ctx,
 		accountID,
 		sessionID,
 		7*24*time.Hour,
@@ -62,13 +63,14 @@ func SessionCreation(
 }
 
 func SessionAuthentication(
+	ctx context.Context,
 	redisClient *redis.Client,
 	session string,
 ) (string, error) {
 
 	session = "session:" + session
 
-	accountID, err := redisClient.Get(context.Background(), session).Result()
+	accountID, err := redisClient.Get(ctx, session).Result()
 	if err != nil && err != redis.Nil {
 		return "", err
 	}

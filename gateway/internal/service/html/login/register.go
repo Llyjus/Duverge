@@ -8,7 +8,7 @@ import (
 
 func register(
 	userDataClient *userdata.Client,
-	context context.Context,
+	ctx context.Context,
 	username,
 	password string) (bool, error) {
 
@@ -17,8 +17,8 @@ func register(
 		Password:  password,
 	}
 
-	res, err := userDataClient.GetClient().UserRegistration(
-		context,
+	res, err := userDataClient.UserRegistration(
+		ctx,
 		req,
 	)
 

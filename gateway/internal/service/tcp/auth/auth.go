@@ -32,6 +32,7 @@ func Authenticate(
 
 	// Authenticate the login session
 	userID, err := auth.SessionAuthentication(
+		ctx,
 		redisClient,
 		authMsg.LoginSession,
 	)

@@ -65,6 +65,7 @@ func HandleConnection(
 			continue
 		}
 
+		// check the message version
 		if msg.Version != protocol.Version {
 			log.Printf("[TCP] unsupported message version: %v\n", msg.Version)
 

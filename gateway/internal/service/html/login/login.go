@@ -12,7 +12,7 @@ import (
 func login(
 	userDataClient *userdata.Client,
 	redisClient *redis.Client,
-	context context.Context,
+	ctx context.Context,
 	accountId string,
 	password string) (string, error) {
 
@@ -21,8 +21,8 @@ func login(
 		Password:  password,
 	}
 
-	res, err := userDataClient.GetClient().UserLogin(
-		context,
+	res, err := userDataClient.UserLogin(
+		ctx,
 		req,
 	)
 
@@ -33,7 +33,8 @@ func login(
 	if res.SessionId == "" {
 		return "", err
 	}
-	sessionId, err := auth.SessionCreation(redisClient,
+	sessionId, err := auth.SessionCreation(ctx,
+		redisClient,
 		res.SessionId,
 		accountId)
 	if err != nil || sessionId == "" {

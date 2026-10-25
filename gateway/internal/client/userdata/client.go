@@ -1,6 +1,7 @@
 package userdata
 
 import (
+	"context"
 	gen "gateway/proto/userdata/gen"
 
 	"google.golang.org/grpc"
@@ -10,10 +11,6 @@ import (
 type Client struct {
 	client gen.UserDataServiceClient
 	conn   *grpc.ClientConn
-}
-
-func (c *Client) GetClient() gen.UserDataServiceClient {
-	return c.client
 }
 
 func NewClient(addr string) (*Client, error) {
@@ -31,6 +28,14 @@ func NewClient(addr string) (*Client, error) {
 		client: client,
 		conn:   conn,
 	}, nil
+}
+
+func (c *Client) UserLogin(ctx context.Context, request *gen.UserLoginRequest) (*gen.UserLoginResponse, error) {
+	return c.client.UserLogin(ctx, request)
+}
+
+func (c *Client) UserRegistration(ctx context.Context, request *gen.UserRegistrationRequest) (*gen.UserRegistrationResponse, error) {
+	return c.client.UserRegistration(ctx, request)
 }
 
 func (c *Client) Close() {
