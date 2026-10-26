@@ -2,10 +2,14 @@ package userdata
 
 import (
 	"context"
+	"fmt"
+	internalerrors "gateway/internal/errors"
 	gen "gateway/proto/userdata/gen"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type Client struct {
@@ -31,11 +35,20 @@ func NewClient(addr string) (*Client, error) {
 }
 
 func (c *Client) UserLogin(ctx context.Context, request *gen.UserLoginRequest) (*gen.UserLoginResponse, error) {
-	return c.client.UserLogin(ctx, request)
+	response, err := c.client.UserLogin(ctx, request)
+	return response, mapDependencyError(err)
 }
 
 func (c *Client) UserRegistration(ctx context.Context, request *gen.UserRegistrationRequest) (*gen.UserRegistrationResponse, error) {
-	return c.client.UserRegistration(ctx, request)
+	response, err := c.client.UserRegistration(ctx, request)
+	return response, mapDependencyError(err)
+}
+
+func mapDependencyError(err error) error {
+	if err != nil && status.Code(err) == codes.Unavailable {
+		return fmt.Errorf("%w: %w", internalerrors.ErrUserDataUnavailable, err)
+	}
+	return err
 }
 
 func (c *Client) Close() {

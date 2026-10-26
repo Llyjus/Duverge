@@ -1,19 +1,17 @@
 package login
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"gateway/internal/client/userdata"
+	internalerrors "gateway/internal/errors"
 	"gateway/internal/metrics"
 	serverresponse "gateway/internal/service/html/serverResponse"
 	"net/http"
 	"time"
 
 	redis "github.com/redis/go-redis/v9"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) http.HandlerFunc {
@@ -51,8 +49,12 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			res, err = login(userDataClient, redisClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
-				if isRequestTimeout(err) {
+				if internalerrors.IsRequestTimeout(err) {
 					http.Error(w, "Request timed out", http.StatusServiceUnavailable)
+					return
+				}
+				if errors.Is(err, internalerrors.ErrUserDataUnavailable) {
+					http.Error(w, "UserData service unavailable", http.StatusServiceUnavailable)
 					return
 				}
 				http.Error(w, "Error occurred while logging in", http.StatusInternalServerError)
@@ -78,8 +80,12 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			res, err = register(userDataClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
-				if isRequestTimeout(err) {
+				if internalerrors.IsRequestTimeout(err) {
 					http.Error(w, "Request timed out", http.StatusServiceUnavailable)
+					return
+				}
+				if errors.Is(err, internalerrors.ErrUserDataUnavailable) {
+					http.Error(w, "UserData service unavailable", http.StatusServiceUnavailable)
 					return
 				}
 				http.Error(
@@ -105,9 +111,4 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 			http.Error(w, "Invalid request type", http.StatusBadRequest)
 		}
 	}
-}
-
-// check if the error is a context deadline exceeded error
-func isRequestTimeout(err error) bool {
-	return errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded
 }

@@ -265,7 +265,8 @@ ok
 |---|---|
 | `400` | JSON 非法或 `type` 不支持 |
 | `401` | `accountId` 已存在 |
-| `500` | UserData 或数据库错误 |
+| `503` | 请求超时（`Request timed out`）或 UserData gRPC 服务不可用（`UserData service unavailable`） |
+| `500` | 其他 UserData、Redis 或数据库错误 |
 
 密码由 UserData 使用 BCrypt 保存，Gateway 不直接访问 `users` 表。
 
@@ -296,7 +297,8 @@ ok
 |---|---|
 | `400` | JSON 非法或 `type` 不支持 |
 | `401` | 用户名或密码错误 |
-| `500` | UserData、Redis 或 session 创建失败 |
+| `503` | 请求超时（`Request timed out`）或 UserData gRPC 服务不可用（`UserData service unavailable`） |
+| `500` | 其他 UserData、Redis 或 session 创建错误 |
 
 登录成功后，Gateway 会在 Redis 创建两个 7 天 TTL 的 session key，并创建一个 30 秒 TTL 的用户状态 key（详见 [Redis 数据字典](#redis-数据字典)）。
 

@@ -219,6 +219,8 @@ Successful login returns an opaque session ID:
 {"success":true,"sessionId":"<opaque-session-id>"}
 ```
 
+For `POST /login`, malformed input returns `400`, duplicate registration or invalid login credentials return `401`, and a request timeout returns `503 Request timed out`. If the UserData gRPC service is unavailable, both registration and login return `503 UserData service unavailable`. Other unexpected UserData or Redis failures return `500`.
+
 ### Validate session
 
 ```json
