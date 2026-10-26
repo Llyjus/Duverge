@@ -16,6 +16,7 @@ Duverge is an experimental multiplayer game backend. It contains a Go Gateway, a
 - [Timeouts](#timeouts)
 - [gRPC services](#grpc-services)
 - [Storage](#storage)
+- [MySQL pool and query timeouts](#mysql-pool-and-query-timeouts)
 - [Password hashing limits](#password-hashing-limits)
 - [Development and tests](#development-and-tests)
 - [Security and current limitations](#security-and-current-limitations)
@@ -345,6 +346,29 @@ User statuses include `in_lobby`, `in_room` and `in_game`. Room statuses include
 ### MySQL
 
 The `users` table stores an auto-increment ID, unique account ID and BCrypt password hash. JPA currently uses `ddl-auto: update` for development; production should use managed schema migrations. UserData uses `MYSQL_DATABASE`, `MYSQL_USER` and `MYSQL_PASSWORD` from Compose.
+
+## MySQL pool and query timeouts
+
+UserData uses HikariCP. Its physical connection pool is capped at 10 connections by default, and callers wait at most 3 seconds to borrow a connection. The JDBC connect timeout is 3 seconds; the JDBC socket I/O timeout is 5 seconds. Hibernate/JPA is configured with a default query timeout of 3 seconds (milliseconds in configuration).
+
+Override these values in the root `.env`:
+
+| Environment variable | Default | Meaning |
+|---|---:|---|
+| `MYSQL_POOL_MAX_SIZE` | `10` | Maximum Hikari connections |
+| `MYSQL_POOL_CONNECTION_TIMEOUT_MS` | `3000` | Maximum wait for a pooled connection, milliseconds |
+| `MYSQL_POOL_VALIDATION_TIMEOUT_MS` | `2000` | Maximum connection validation duration; must remain below the acquisition timeout |
+| `MYSQL_QUERY_TIMEOUT_MS` | `3000` | JPA query timeout hint, milliseconds |
+| `MYSQL_CONNECT_TIMEOUT_MS` | `3000` | MySQL TCP connect timeout, milliseconds |
+| `MYSQL_SOCKET_TIMEOUT_MS` | `5000` | MySQL socket I/O timeout, milliseconds |
+
+Recreate UserData to apply changes:
+
+```bash
+docker compose up -d --build userdata
+```
+
+The pool bounds active database connections and the acquisition timeout bounds how long a caller waits. Hikari does not itself set a maximum number of application requests waiting to borrow a connection; that count depends on upstream request concurrency. The JPA query timeout is a JDBC/provider hint, and socket timeout bounds network I/O rather than guaranteeing that MySQL cancels server-side work immediately. Monitor Hikari active, idle and pending connections, and validate slow-query behavior against an isolated database.
 
 ## Password hashing limits
 

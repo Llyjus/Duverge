@@ -18,6 +18,7 @@ Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Ga
 - [内部 gRPC API](#内部-grpc-api)
 - [Redis 数据字典](#redis-数据字典)
 - [MySQL 数据字典](#mysql-数据字典)
+- [MySQL 连接池与查询超时](#mysql-连接池与查询超时)
 - [状态机与业务约束](#状态机与业务约束)
 - [测试与验证](#测试与验证)
 - [安全与已知限制](#安全与已知限制)
@@ -859,6 +860,29 @@ Room 使用 Redis `WATCH`/事务更新 `room:<roomId>` 和相关 `user_status:<u
 | `password` | VARCHAR | BCrypt 哈希，不保存明文密码 |
 
 当前 UserData 只通过 gRPC 暴露注册和登录，不提供用户查询、修改密码或删除用户的公开 API。
+
+## MySQL 连接池与查询超时
+
+UserData 使用 HikariCP。默认最多建立 10 个数据库连接；连接池无空闲连接时，借用连接最多等待 3 秒。MySQL TCP 建连超时为 3 秒，socket I/O 超时为 5 秒；Hibernate/JPA 默认查询超时设为 3 秒（配置单位为毫秒）。
+
+可在根目录 `.env` 覆盖：
+
+| 环境变量 | 默认值 | 含义 |
+|---|---:|---|
+| `MYSQL_POOL_MAX_SIZE` | `10` | Hikari 最大连接数 |
+| `MYSQL_POOL_CONNECTION_TIMEOUT_MS` | `3000` | 等待获取连接的上限，毫秒 |
+| `MYSQL_POOL_VALIDATION_TIMEOUT_MS` | `2000` | 校验连接的最长时间；必须小于获取连接超时 |
+| `MYSQL_QUERY_TIMEOUT_MS` | `3000` | JPA 查询超时提示，毫秒 |
+| `MYSQL_CONNECT_TIMEOUT_MS` | `3000` | MySQL TCP 建连超时，毫秒 |
+| `MYSQL_SOCKET_TIMEOUT_MS` | `5000` | MySQL socket I/O 超时，毫秒 |
+
+修改后重建 UserData：
+
+```bash
+docker compose up -d --build userdata
+```
+
+连接池上限限制实际数据库连接数，连接获取超时限制单个调用等待连接的时长；但 Hikari 本身没有限制等待连接的应用请求数量，该数量仍受上游请求并发影响。JPA 查询超时属于 JDBC/provider 提示；socket timeout 限制网络 I/O，并不保证 MySQL 服务端立即停止正在执行的 SQL。应观察 Hikari active/idle/pending 指标，并在隔离数据库中验证慢查询行为。
 
 ## 状态机与业务约束
 
