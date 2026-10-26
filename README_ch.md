@@ -200,6 +200,10 @@ histogram_quantile(0.95,
 | `password_hash_permit_queue_full_total` | 等待队列达到上限而拒绝的次数 |
 | `userdata_grpc_server_requests_seconds_*` | UserData gRPC 请求耗时 |
 | `userdata_database_operation_seconds_*` | UserData 数据库操作耗时 |
+| `hikaricp_connections_active` | 当前从连接池借出、正在使用的连接数 |
+| `hikaricp_connections_idle` | 已建立但空闲、可供借用的连接数 |
+| `hikaricp_connections_max` | 连接池配置的最大连接数 |
+| `hikaricp_connections_pending` | 当前等待从连接池获取连接的调用数 |
 
 并发峰值 Gauge 在 UserData 重启时重置。短暂的压测阶段可能刚好发生在两次采集之间，导致瞬时峰值没有被抓到；可延长测试阶段或缩短采集间隔。Prometheus `rate()` 是窗口平均速率，并非瞬时并发数或单次请求耗时。
 

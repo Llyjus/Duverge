@@ -71,10 +71,12 @@
       "targets": [
         {"expr": "jvm_threads_live_threads{job=\"userdata\"}", "legendFormat": "JVM live threads", "refId": "A"},
         {"expr": "hikaricp_connections_active{job=\"userdata\"}", "legendFormat": "DB active connections", "refId": "B"},
-        {"expr": "hikaricp_connections_pending{job=\"userdata\"}", "legendFormat": "DB pending connections", "refId": "C"},
-        {"expr": "executor_queued_tasks{job=\"userdata\"}", "legendFormat": "Spring executor queued tasks", "refId": "D"},
-        {"expr": "executor_active_threads{job=\"userdata\"}", "legendFormat": "Spring executor active threads", "refId": "E"}
-      ], "title": "Threads and exported queues", "type": "timeseries"
+        {"expr": "hikaricp_connections_idle{job=\"userdata\"}", "legendFormat": "DB idle connections", "refId": "C"},
+        {"expr": "hikaricp_connections_max{job=\"userdata\"}", "legendFormat": "DB max connections", "refId": "D"},
+        {"expr": "hikaricp_connections_pending{job=\"userdata\"}", "legendFormat": "Requests waiting for DB connection", "refId": "E"},
+        {"expr": "executor_queued_tasks{job=\"userdata\"}", "legendFormat": "Spring executor queued tasks", "refId": "F"},
+        {"expr": "executor_active_threads{job=\"userdata\"}", "legendFormat": "Spring executor active threads", "refId": "G"}
+      ], "title": "Threads and HikariCP connection pool", "type": "timeseries"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},

@@ -183,6 +183,10 @@ Other useful UserData metrics include:
 | `password_hash_permit_queue_full_total` | Calls rejected because the configured waiting limit was full |
 | `userdata_grpc_server_requests_seconds_*` | UserData gRPC request duration |
 | `userdata_database_operation_seconds_*` | Timed UserData database operations |
+| `hikaricp_connections_active` | Connections currently borrowed from the UserData pool |
+| `hikaricp_connections_idle` | Open connections currently idle in the pool and available for borrowing |
+| `hikaricp_connections_max` | Configured maximum number of pool connections |
+| `hikaricp_connections_pending` | Callers currently waiting to borrow a pool connection |
 
 Peak gauges reset when UserData restarts. A short load phase may finish between Prometheus scrapes; use a longer test phase or a sufficiently short scrape interval when measuring peaks. A Prometheus `rate()` over a window is an averaged completion rate, not a single request's latency or instantaneous concurrency.
 
