@@ -3,6 +3,7 @@ package com.duverge.userdata.service;
 import org.springframework.stereotype.Service;
 
 import com.duverge.userdata.entity.User;
+import com.duverge.userdata.internal.Infra.LimitedDatabaseExecutor;
 import com.duverge.userdata.repository.UserRepository;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -15,11 +16,17 @@ public class UserService {
     final UserRepository userRepository;
     private final MeterRegistry meterRegistry;
     private final PasswordEncoder passwordEncoder;
+    private final LimitedDatabaseExecutor databaseExecutor;
 
-    public UserService(UserRepository userRepository, MeterRegistry meterRegistry, PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository,
+            MeterRegistry meterRegistry,
+            PasswordEncoder passwordEncoder,
+            LimitedDatabaseExecutor databaseExecutor) {
         this.userRepository = userRepository;
         this.meterRegistry = meterRegistry;
         this.passwordEncoder = passwordEncoder;
+        this.databaseExecutor = databaseExecutor;
     }
 
     public boolean setNewUser(String accountId, String password) {
@@ -60,18 +67,18 @@ public class UserService {
     }
 
     public User getUser(String accountId) {
-        return userRepository.findByAccountId(accountId);
+        return timedDatabase("find_by_account_id", () -> userRepository.findByAccountId(accountId));
     }
 
     public User getUserById(Long id) {
-        return userRepository.findById(id).orElse(null);
+        return timedDatabase("find_by_id", () -> userRepository.findById(id).orElse(null));
     }
 
     private <T> T timedDatabase(String operation, java.util.function.Supplier<T> action) {
-        return Timer.builder("userdata.database.operation")
-                .description("User database operation duration")
-                .tag("operation", operation)
-                .register(meterRegistry)
-                .record(action);
+        return databaseExecutor.execute(() -> Timer.builder("userdata.database.operation")
+                    .description("User database operation duration")
+                    .tag("operation", operation)
+                    .register(meterRegistry)
+                    .record(action));
     }
 }

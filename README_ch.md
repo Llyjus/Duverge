@@ -19,6 +19,7 @@ Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Ga
 - [Redis 数据字典](#redis-数据字典)
 - [MySQL 数据字典](#mysql-数据字典)
 - [MySQL 连接池与查询超时](#mysql-连接池与查询超时)
+- [数据库操作准入限制](#数据库操作准入限制)
 - [状态机与业务约束](#状态机与业务约束)
 - [测试与验证](#测试与验证)
 - [安全与已知限制](#安全与已知限制)
@@ -204,6 +205,12 @@ histogram_quantile(0.95,
 | `hikaricp_connections_idle` | 已建立但空闲、可供借用的连接数 |
 | `hikaricp_connections_max` | 连接池配置的最大连接数 |
 | `hikaricp_connections_pending` | 当前等待从连接池获取连接的调用数 |
+| `userdata_database_active` | 已准入且当前正在执行的数据库操作数 |
+| `userdata_database_waiting` | 当前等待数据库操作准入许可的调用数 |
+| `userdata_database_active_max` | 进程启动以来观测到的数据库操作执行并发峰值 |
+| `userdata_database_permit_wait_seconds_*` | 等待数据库操作准入许可的耗时 |
+| `userdata_database_permit_timeout_total` | 等待准入许可超时而拒绝的请求数 |
+| `userdata_database_permit_queue_full_total` | 有界等待队列已满而拒绝的请求数 |
 
 并发峰值 Gauge 在 UserData 重启时重置。短暂的压测阶段可能刚好发生在两次采集之间，导致瞬时峰值没有被抓到；可延长测试阶段或缩短采集间隔。Prometheus `rate()` 是窗口平均速率，并非瞬时并发数或单次请求耗时。
 
@@ -886,7 +893,21 @@ UserData 使用 HikariCP。默认最多建立 10 个数据库连接；连接池�
 docker compose up -d --build userdata
 ```
 
-连接池上限限制实际数据库连接数，连接获取超时限制单个调用等待连接的时长；但 Hikari 本身没有限制等待连接的应用请求数量，该数量仍受上游请求并发影响。JPA 查询超时属于 JDBC/provider 提示；socket timeout 限制网络 I/O，并不保证 MySQL 服务端立即停止正在执行的 SQL。应观察 Hikari active/idle/pending 指标，并在隔离数据库中验证慢查询行为。
+连接池上限限制实际数据库连接数，连接获取超时限制单个调用等待连接的时长。UserData 还会在 repository 操作前执行有界准入：默认最多 10 个操作同时执行、最多 10 个调用等待，等待上限为 1 秒。请让执行上限不大于 Hikari 最大连接数，避免准入后的操作继续堆积在连接池中。JPA 查询超时属于 JDBC/provider 提示；socket timeout 限制网络 I/O，并不保证 MySQL 服务端立即停止正在执行的 SQL。应同时观察 Hikari active/idle/pending 和数据库准入指标，并在隔离数据库中验证慢查询行为。
+
+## 数据库操作准入限制
+
+`UserService` 中所有 repository 操作共用一个公平信号量。默认最多 10 个操作同时执行，最多 10 个额外调用等待，每个等待调用最多等 1 秒。等待队列满或等待超时后，gRPC 返回 `RESOURCE_EXHAUSTED`；不会把过载伪装成用户不存在或注册成功。等待者使用现有 gRPC 请求线程，不会额外创建线程池。
+
+可在根目录 `.env` 调整并重建 UserData：
+
+| 环境变量 | 默认值 | 含义 |
+|---|---:|---|
+| `USERDATA_DATABASE_MAX_CONCURRENCY` | `10` | 同时执行的 repository 操作上限；建议与 `MYSQL_POOL_MAX_SIZE` 对齐 |
+| `USERDATA_DATABASE_MAX_WAITERS` | `10` | 等待准入许可的调用上限；设为 `0` 时无空闲许可就立即拒绝 |
+| `USERDATA_DATABASE_ACQUIRE_TIMEOUT` | `1s` | 等待准入许可的最长时间 |
+
+Grafana 的 **Database admission and bounded waiters** 面板展示正在执行数、等待数、历史执行峰值及拒绝速率。Hikari pending 指标仍可用于观察此准入入口之外的连接池竞争。
 
 ## 状态机与业务约束
 

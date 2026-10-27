@@ -30,6 +30,11 @@ spring:
   #     port: 6379
 
 userdata:
+  database:
+    # Keep max-concurrency aligned with spring.datasource.hikari.maximum-pool-size.
+    max-concurrency: ${USERDATA_DATABASE_MAX_CONCURRENCY:10}
+    acquire-timeout: ${USERDATA_DATABASE_ACQUIRE_TIMEOUT:1s}
+    max-waiters: ${USERDATA_DATABASE_MAX_WAITERS:10}
   password-hash:
     # 0 disables the execution limit for an unconstrained benchmark baseline.
     max-concurrency: ${USERDATA_PASSWORD_HASH_MAX_CONCURRENCY:10}
@@ -47,6 +52,7 @@ management:
         userdata.password.operation: true
         userdata.password.permit.wait: true
         userdata.database.operation: true
+        userdata.database.permit.wait: true
   endpoints:
     web:
       exposure:

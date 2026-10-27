@@ -1,4 +1,4 @@
-package com.duverge.userdata.internal;
+package com.duverge.userdata.internal.Infra;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,6 +13,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.duverge.userdata.error.PasswordHashUnavailableException;
 
 import org.junit.jupiter.api.Test;
 

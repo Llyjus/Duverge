@@ -1,6 +1,6 @@
 {
   "annotations": {"list": []},
-  "description": "UserData and Gateway load correlation: CPU, BCrypt, gRPC, HTTP, threads and queues.",
+  "description": "UserData and Gateway load correlation: CPU, BCrypt, gRPC, HTTP, database admission and queues.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -154,6 +154,30 @@
         {"expr": "rate(password_hash_permit_timeout_total{job=\"userdata\"}[$__rate_interval])", "legendFormat": "Permit timeout rejects/s", "refId": "A"},
         {"expr": "rate(password_hash_permit_queue_full_total{job=\"userdata\"}[$__rate_interval])", "legendFormat": "Queue full rejects/s", "refId": "B"}
       ], "title": "Password hash permit rejects", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Database operations admitted to the service, bounded waiters, observed peak concurrency and admission rejects.",
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 60},
+      "id": 14, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "userdata_database_active{job=\"userdata\"}", "legendFormat": "DB operations executing", "refId": "A"},
+        {"expr": "userdata_database_waiting{job=\"userdata\"}", "legendFormat": "DB operations waiting", "refId": "B"},
+        {"expr": "userdata_database_active_max{job=\"userdata\"}", "legendFormat": "Peak executing since start", "refId": "C"},
+        {"expr": "rate(userdata_database_permit_timeout_total{job=\"userdata\"}[$__rate_interval])", "legendFormat": "Wait timeout rejects/s", "refId": "D"},
+        {"expr": "rate(userdata_database_permit_queue_full_total{job=\"userdata\"}[$__rate_interval])", "legendFormat": "Queue full rejects/s", "refId": "E"}
+      ], "title": "Database admission and bounded waiters", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "P95 time spent waiting for a database admission permit before repository work starts.",
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 68},
+      "id": 15, "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(userdata_database_permit_wait_seconds_bucket{job=\"userdata\"}[$__rate_interval])))", "legendFormat": "DB admission wait P95", "refId": "A"}
+      ], "title": "Database admission wait P95", "type": "timeseries"
     }
   ],
   "refresh": "5s",

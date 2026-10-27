@@ -1,4 +1,4 @@
-package com.duverge.userdata.internal;
+package com.duverge.userdata.internal.Infra;
 
 import java.time.Duration;
 import java.util.concurrent.Semaphore;
@@ -8,6 +8,8 @@ import java.util.function.Supplier;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import com.duverge.userdata.error.PasswordHashUnavailableException;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;

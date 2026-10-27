@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.duverge.userdata.entity.User;
-import com.duverge.userdata.internal.LimitedPasswordEncoder;
+import com.duverge.userdata.internal.Infra.LimitedDatabaseExecutor;
+import com.duverge.userdata.internal.Infra.LimitedPasswordEncoder;
 import com.duverge.userdata.repository.UserRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -42,7 +43,8 @@ class UserServicePasswordMetricsTests {
                 });
         meterRegistry = new SimpleMeterRegistry();
         passwordEncoder = new LimitedPasswordEncoder(meterRegistry, 10, Duration.ofSeconds(1), 10);
-        userService = new UserService(userRepository, meterRegistry, passwordEncoder);
+        userService = new UserService(userRepository, meterRegistry, passwordEncoder,
+                new LimitedDatabaseExecutor(meterRegistry, 10, Duration.ofSeconds(1), 10));
     }
 
     @Test

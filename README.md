@@ -17,6 +17,7 @@ Duverge is an experimental multiplayer game backend. It contains a Go Gateway, a
 - [gRPC services](#grpc-services)
 - [Storage](#storage)
 - [MySQL pool and query timeouts](#mysql-pool-and-query-timeouts)
+- [Database admission control](#database-admission-control)
 - [Password hashing limits](#password-hashing-limits)
 - [Development and tests](#development-and-tests)
 - [Security and current limitations](#security-and-current-limitations)
@@ -106,7 +107,7 @@ Grafana is provisioned with a Prometheus datasource and loads dashboards from `m
 docker compose restart grafana
 ```
 
-The correlated dashboard includes process CPU, BCrypt P50/P95/P99 and mean, UserData gRPC latency, Gateway HTTP latency, database operation latency, exported JVM/Hikari/executor data, request rates, BCrypt concurrency and waiters, peak concurrency, permit wait P95, and rejection rates.
+The correlated dashboard includes process CPU, BCrypt P50/P95/P99 and mean, UserData gRPC latency, Gateway HTTP latency, database operation latency and admission, exported JVM/Hikari/executor data, request rates, BCrypt concurrency and waiters, peak concurrency, permit wait P95, and rejection rates.
 
 Two dashboard panels depend on metrics that are not uniformly available: the **Process CPU** panel queries Spring's `process_cpu_usage` for Gateway and Room as well as UserData, but the Go Prometheus collector exposes `process_cpu_seconds_total` instead. Therefore the UserData CPU series is the expected one in that panel; use `rate(process_cpu_seconds_total{job="gateway"}[1m])` or the equivalent `room` query for Go process CPU (CPU-seconds per second, where `1` is one fully used core). The **Container CPU throttling** panel expects cAdvisor/cgroup metrics, but the current Prometheus configuration does not scrape cAdvisor, so that panel can be empty while application targets are healthy.
 
@@ -187,6 +188,12 @@ Other useful UserData metrics include:
 | `hikaricp_connections_idle` | Open connections currently idle in the pool and available for borrowing |
 | `hikaricp_connections_max` | Configured maximum number of pool connections |
 | `hikaricp_connections_pending` | Callers currently waiting to borrow a pool connection |
+| `userdata_database_active` | Database operations currently admitted and executing |
+| `userdata_database_waiting` | Database operations waiting for an admission permit |
+| `userdata_database_active_max` | Peak admitted database operation concurrency since process start |
+| `userdata_database_permit_wait_seconds_*` | Time spent waiting for database admission |
+| `userdata_database_permit_timeout_total` | Requests rejected after the database admission wait timeout |
+| `userdata_database_permit_queue_full_total` | Requests rejected because the bounded database waiting list was full |
 
 Peak gauges reset when UserData restarts. A short load phase may finish between Prometheus scrapes; use a longer test phase or a sufficiently short scrape interval when measuring peaks. A Prometheus `rate()` over a window is an averaged completion rate, not a single request's latency or instantaneous concurrency.
 
@@ -372,7 +379,21 @@ Recreate UserData to apply changes:
 docker compose up -d --build userdata
 ```
 
-The pool bounds active database connections and the acquisition timeout bounds how long a caller waits. Hikari does not itself set a maximum number of application requests waiting to borrow a connection; that count depends on upstream request concurrency. The JPA query timeout is a JDBC/provider hint, and socket timeout bounds network I/O rather than guaranteeing that MySQL cancels server-side work immediately. Monitor Hikari active, idle and pending connections, and validate slow-query behavior against an isolated database.
+The pool bounds active database connections and the acquisition timeout bounds how long a caller waits. UserData also applies a bounded admission gate before repository operations; its default is 10 active operations, 10 waiting callers and a 1-second admission wait. Keep its active limit at or below the Hikari maximum so admitted work does not simply accumulate inside Hikari. The JPA query timeout is a JDBC/provider hint, and socket timeout bounds network I/O rather than guaranteeing that MySQL cancels server-side work immediately. Monitor Hikari active, idle and pending connections alongside the database admission metrics, and validate slow-query behavior against an isolated database.
+
+## Database admission control
+
+All repository operations made through `UserService` pass through one fair semaphore. Defaults are aligned with the Hikari pool: at most 10 operations execute at once, at most 10 additional callers wait, and each waiter waits no longer than 1 second. Calls beyond the waiting limit, or calls that time out, fail with gRPC `RESOURCE_EXHAUSTED`; they are not reported as a missing user or successful registration.
+
+Override the admission settings in the root `.env` and recreate UserData:
+
+| Environment variable | Default | Meaning |
+|---|---:|---|
+| `USERDATA_DATABASE_MAX_CONCURRENCY` | `10` | Maximum simultaneous repository operations; keep aligned with `MYSQL_POOL_MAX_SIZE` |
+| `USERDATA_DATABASE_MAX_WAITERS` | `10` | Maximum callers waiting for an admission permit; `0` rejects immediately when all permits are occupied |
+| `USERDATA_DATABASE_ACQUIRE_TIMEOUT` | `1s` | Maximum time each caller waits for an admission permit |
+
+The queue is bounded, but these waiting callers still occupy their existing gRPC request threads. The gate does not create a new thread pool. Grafana's **Database admission and bounded waiters** panel shows executing operations, waiters, peak execution concurrency and rejection rates. The Hikari pending metric remains useful for identifying pool contention outside or beyond this gate.
 
 ## Password hashing limits
 

@@ -2,7 +2,8 @@ package com.duverge.userdata.grpc;
 
 import org.springframework.grpc.server.service.GrpcService;
 
-import com.duverge.userdata.internal.PasswordHashUnavailableException;
+import com.duverge.userdata.error.PasswordHashUnavailableException;
+import com.duverge.userdata.error.DatabaseCapacityUnavailableException;
 import com.duverge.userdata.internal.RandomSession;
 import com.duverge.userdata.service.UserService;
 import com.example.userdata.grpc.UserDataServiceGrpc;
@@ -40,6 +41,11 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
                     .withDescription("Password hashing capacity is temporarily exhausted")
                     .asRuntimeException());
             return;
+        } catch (DatabaseCapacityUnavailableException e) {
+            responseObserver.onError(Status.RESOURCE_EXHAUSTED
+                    .withDescription("Database capacity is temporarily exhausted")
+                    .asRuntimeException());
+            return;
         }
         
         var sessionId = "";
@@ -70,6 +76,11 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         } catch (PasswordHashUnavailableException e) {
             responseObserver.onError(Status.RESOURCE_EXHAUSTED
                     .withDescription("Password hashing capacity is temporarily exhausted")
+                    .asRuntimeException());
+            return;
+        } catch (DatabaseCapacityUnavailableException e) {
+            responseObserver.onError(Status.RESOURCE_EXHAUSTED
+                    .withDescription("Database capacity is temporarily exhausted")
                     .asRuntimeException());
             return;
         }

@@ -2,7 +2,7 @@ package com.duverge.userdata.config;
 
 import java.time.Duration;
 
-import com.duverge.userdata.internal.LimitedPasswordEncoder;
+import com.duverge.userdata.internal.Infra.LimitedPasswordEncoder;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
