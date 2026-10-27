@@ -314,6 +314,8 @@ TCP has separate authentication, idle-read, operation and write deadlines. Overr
 | Environment variable | Default | Meaning |
 |---|---:|---|
 | `GATEWAY_REQUEST_TIMEOUT` | `10s` | Total budget for one HTTP request |
+| `GATEWAY_GRPC_RETRY_MAX_ATTEMPTS` | `3` | Total attempts for safe downstream gRPC calls, including the first |
+| `GATEWAY_GRPC_RETRY_INTERVAL` | `200ms` | Delay between retries of safe downstream calls |
 | `GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT` | `10s` | Time to authenticate after TCP connect |
 | `GATEWAY_TCP_IDLE_TIMEOUT` | `45s` | Maximum idle time between TCP messages |
 | `GATEWAY_TCP_OPERATION_TIMEOUT` | `5s` | Deadline for auth, chat, heartbeat and other TCP operations |
@@ -323,6 +325,8 @@ Example override:
 
 ```env
 GATEWAY_REQUEST_TIMEOUT=8s
+GATEWAY_GRPC_RETRY_MAX_ATTEMPTS=3
+GATEWAY_GRPC_RETRY_INTERVAL=200ms
 GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT=12s
 GATEWAY_TCP_IDLE_TIMEOUT=60s
 GATEWAY_TCP_OPERATION_TIMEOUT=4s
@@ -334,6 +338,8 @@ Recreate Gateway to apply changes:
 ```bash
 docker compose up -d --build gateway
 ```
+
+Gateway retries `UNAVAILABLE` for UserData login and Room info lookup, which are safe to repeat. The delay defaults to 200 ms and the maximum is 3 total attempts, within the original request context deadline. Registration and room mutations are not automatically retried because a lost response can follow a successful write and repeating it can change the result or create duplicate state. `DEADLINE_EXCEEDED` and other status codes are not retried.
 
 ## gRPC services
 

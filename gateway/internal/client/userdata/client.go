@@ -3,6 +3,7 @@ package userdata
 import (
 	"context"
 	"fmt"
+	"gateway/internal/client/retry"
 	internalerrors "gateway/internal/errors"
 	gen "gateway/proto/userdata/gen"
 
@@ -13,11 +14,16 @@ import (
 )
 
 type Client struct {
-	client gen.UserDataServiceClient
-	conn   *grpc.ClientConn
+	client      gen.UserDataServiceClient
+	conn        *grpc.ClientConn
+	retryPolicy retry.Policy
 }
 
 func NewClient(addr string) (*Client, error) {
+	return NewClientWithRetryPolicy(addr, retry.DefaultPolicy())
+}
+
+func NewClientWithRetryPolicy(addr string, policy retry.Policy) (*Client, error) {
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -29,13 +35,16 @@ func NewClient(addr string) (*Client, error) {
 	client := gen.NewUserDataServiceClient(conn)
 
 	return &Client{
-		client: client,
-		conn:   conn,
+		client:      client,
+		conn:        conn,
+		retryPolicy: policy,
 	}, nil
 }
 
 func (c *Client) UserLogin(ctx context.Context, request *gen.UserLoginRequest) (*gen.UserLoginResponse, error) {
-	response, err := c.client.UserLogin(ctx, request)
+	response, err := retry.Do(ctx, c.retryPolicy, func(ctx context.Context) (*gen.UserLoginResponse, error) {
+		return c.client.UserLogin(ctx, request)
+	})
 	return response, mapDependencyError(err)
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gateway/internal/client/redis_client"
+	"gateway/internal/client/retry"
 	"gateway/internal/client/room"
 	"gateway/internal/client/userdata"
 	"gateway/internal/server"
@@ -30,6 +31,11 @@ func main() {
 			return
 		}
 		requestTimeout = parsed
+	}
+	grpcRetryPolicy, err := retry.PolicyFromEnv()
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
 	// Load TCP timeouts from environment variables
@@ -65,14 +71,14 @@ func main() {
 	}
 
 	// Create a new userdata client
-	userDataClient, err := userdata.NewClient("userdata:26529")
+	userDataClient, err := userdata.NewClientWithRetryPolicy("userdata:26529", grpcRetryPolicy)
 	if err != nil {
 		fmt.Println("Error creating userdata client:", err)
 		return
 	}
 	defer userDataClient.Close()
 	// create a new room client
-	roomClient, err := room.NewClient("room:26528")
+	roomClient, err := room.NewClientWithRetryPolicy("room:26528", grpcRetryPolicy)
 	if err != nil {
 		fmt.Println("Error creating room client:", err)
 		return

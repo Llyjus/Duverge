@@ -16,7 +16,7 @@ func getRoomInfo(
 		RoomId: roomID,
 	}
 
-	res, err := roomClient.GetClient().GetRoomInfo(
+	res, err := roomClient.GetRoomInfo(
 		ctx,
 		req,
 	)

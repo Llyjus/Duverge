@@ -680,6 +680,8 @@ TCP 连接分别设置认证前等待、空闲读取、单次操作和写入超�
 | 环境变量 | 默认值 | 作用 |
 |---|---:|---|
 | `GATEWAY_REQUEST_TIMEOUT` | `10s` | 每个 HTTP 请求的总预算 |
+| `GATEWAY_GRPC_RETRY_MAX_ATTEMPTS` | `3` | 可安全重试的下游 gRPC 调用总尝试次数，包含第一次 |
+| `GATEWAY_GRPC_RETRY_INTERVAL` | `200ms` | 可安全重试的下游调用之间的等待间隔 |
 | `GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT` | `10s` | TCP 建连后完成认证的最长时间 |
 | `GATEWAY_TCP_IDLE_TIMEOUT` | `45s` | 两次 TCP 消息读取之间允许的最长空闲时间 |
 | `GATEWAY_TCP_OPERATION_TIMEOUT` | `5s` | TCP auth、chat、heartbeat 等操作的 context deadline |
@@ -689,6 +691,8 @@ Docker Compose 默认使用上述值。可在项目根目录 `.env` 覆盖，例
 
 ```env
 GATEWAY_REQUEST_TIMEOUT=8s
+GATEWAY_GRPC_RETRY_MAX_ATTEMPTS=3
+GATEWAY_GRPC_RETRY_INTERVAL=200ms
 GATEWAY_TCP_UNAUTHENTICATED_TIMEOUT=12s
 GATEWAY_TCP_IDLE_TIMEOUT=60s
 GATEWAY_TCP_OPERATION_TIMEOUT=4s
@@ -700,6 +704,8 @@ GATEWAY_TCP_WRITE_TIMEOUT=5s
 ```bash
 docker compose up -d --build gateway
 ```
+
+Gateway 对 UserData 登录和 Room 信息查询遇到 `UNAVAILABLE` 时重试；这两种操作可以安全重复。默认间隔为 200ms，最多尝试 3 次（包含首次调用），并受原请求的 context deadline 限制。注册和房间状态变更不会自动重试，因为响应丢失时第一次写操作可能已经成功，重复执行可能改变结果或创建重复状态。`DEADLINE_EXCEEDED` 和其他状态码不会触发重试。
 
 ## 密码哈希并发限制
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"gateway/internal/client/retry"
 	roomclient "gateway/internal/client/room"
 	userdataclient "gateway/internal/client/userdata"
 	roompb "gateway/proto/room/gen"
@@ -53,6 +54,30 @@ type countedUnavailableRoom struct {
 func (s *countedUnavailableRoom) CreateRoom(context.Context, *roompb.CreateRoomRequest) (*roompb.CreateRoomResponse, error) {
 	s.attempts.Add(1)
 	return nil, status.Error(codes.Unavailable, "injected unavailable error")
+}
+
+type intermittentlyUnavailableUserData struct {
+	userdatapb.UnimplementedUserDataServiceServer
+	attempts atomic.Int32
+}
+
+func (s *intermittentlyUnavailableUserData) UserLogin(context.Context, *userdatapb.UserLoginRequest) (*userdatapb.UserLoginResponse, error) {
+	if s.attempts.Add(1) < 3 {
+		return nil, status.Error(codes.Unavailable, "injected temporary failure")
+	}
+	return &userdatapb.UserLoginResponse{Result: true, SessionId: "test-session"}, nil
+}
+
+type intermittentlyUnavailableRoom struct {
+	roompb.UnimplementedRoomServiceServer
+	attempts atomic.Int32
+}
+
+func (s *intermittentlyUnavailableRoom) GetRoomInfo(context.Context, *roompb.GetRoomInfoRequest) (*roompb.GetRoomInfoResponse, error) {
+	if s.attempts.Add(1) < 3 {
+		return nil, status.Error(codes.Unavailable, "injected temporary failure")
+	}
+	return &roompb.GetRoomInfoResponse{RoomId: "room-1", UserIds: []string{"alice"}}, nil
 }
 
 func (delayedRoom) CreateRoom(ctx context.Context, _ *roompb.CreateRoomRequest) (*roompb.CreateRoomResponse, error) {
@@ -196,7 +221,7 @@ func TestGatewayGRPCCallToUnavailableServiceReturns(t *testing.T) {
 	}
 }
 
-func TestGRPCClientsDoNotRetryReturnedUnavailableErrors(t *testing.T) {
+func TestGatewayDoesNotRetryNonIdempotentRPCs(t *testing.T) {
 	userDataService := &countedUnavailableUserData{}
 	userDataAddr := startGRPCServer(t, func(server *grpc.Server) {
 		userdatapb.RegisterUserDataServiceServer(server, userDataService)
@@ -226,6 +251,46 @@ func TestGRPCClientsDoNotRetryReturnedUnavailableErrors(t *testing.T) {
 	}
 	if got := roomService.attempts.Load(); got != 1 {
 		t.Errorf("Room create attempts = %d, want 1", got)
+	}
+}
+
+func TestGatewayRetriesSafeRPCsOnUnavailable(t *testing.T) {
+	userDataService := &intermittentlyUnavailableUserData{}
+	userDataAddr := startGRPCServer(t, func(server *grpc.Server) {
+		userdatapb.RegisterUserDataServiceServer(server, userDataService)
+	})
+	roomService := &intermittentlyUnavailableRoom{}
+	roomAddr := startGRPCServer(t, func(server *grpc.Server) {
+		roompb.RegisterRoomServiceServer(server, roomService)
+	})
+
+	policy := retry.Policy{MaxAttempts: 3, Interval: 5 * time.Millisecond}
+	userData, err := userdataclient.NewClientWithRetryPolicy(userDataAddr, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(userData.Close)
+	rooms, err := roomclient.NewClientWithRetryPolicy(roomAddr, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(rooms.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	loginResponse, err := userData.UserLogin(ctx, &userdatapb.UserLoginRequest{})
+	if err != nil || !loginResponse.GetResult() {
+		t.Fatalf("UserData login after retry: response=%v err=%v", loginResponse, err)
+	}
+	roomResponse, err := rooms.GetRoomInfo(ctx, &roompb.GetRoomInfoRequest{})
+	if err != nil || roomResponse.GetRoomId() != "room-1" {
+		t.Fatalf("Room lookup after retry: response=%v err=%v", roomResponse, err)
+	}
+	if got := userDataService.attempts.Load(); got != 3 {
+		t.Errorf("UserData login attempts = %d, want 3", got)
+	}
+	if got := roomService.attempts.Load(); got != 3 {
+		t.Errorf("Room lookup attempts = %d, want 3", got)
 	}
 }
 
