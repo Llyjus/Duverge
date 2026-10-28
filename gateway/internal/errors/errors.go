@@ -3,6 +3,7 @@ package errors
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,6 +16,14 @@ var ErrRedisUnavailable = errors.New("Redis is unavailable")
 
 // ErrUserDataUnavailable marks a failed UserData gRPC dependency call.
 var ErrUserDataUnavailable = errors.New("UserData service is unavailable")
+
+// MapDependencyError classifies downstream UserData RPC unavailability.
+func MapDependencyError(err error) error {
+	if err != nil && status.Code(err) == codes.Unavailable {
+		return fmt.Errorf("%w: %w", ErrUserDataUnavailable, err)
+	}
+	return err
+}
 
 // IsRequestTimeout reports whether err represents a context or gRPC deadline.
 func IsRequestTimeout(err error) bool {
