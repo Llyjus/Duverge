@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"gateway/internal/client/retry"
-	internalerrors "gateway/internal/errors"
+	"gateway/internal/errors"
 	gen "gateway/proto/userdata/gen"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 )
 
 type Client struct {
@@ -42,22 +40,48 @@ func NewClientWithRetryPolicy(addr string, policy retry.Policy) (*Client, error)
 }
 
 func (c *Client) UserLogin(ctx context.Context, request *gen.UserLoginRequest) (*gen.UserLoginResponse, error) {
+
+	// Validate the request
+	if request == nil || request.GetMessageId() == "" {
+		return nil, fmt.Errorf("UserData login request message_id is required")
+	}
+
+	// Use the retry mechanism to call the UserLogin RPC
 	response, err := retry.Do(ctx, c.retryPolicy, func(ctx context.Context) (*gen.UserLoginResponse, error) {
 		return c.client.UserLogin(ctx, request)
 	})
-	return response, mapDependencyError(err)
+
+	// Map the error to a more specific error if it's a dependency error
+	if err = errors.MapDependencyError(err); err != nil {
+		return response, err
+	}
+
+	// Check if the response message_id matches the request message_id
+	// shouldn't happen or there's a bug in the UserData service, but we should handle it gracefully
+	if response != nil && response.GetMessageId() != request.GetMessageId() {
+		return nil, fmt.Errorf("UserData login response message_id does not match request")
+	}
+	return response, nil
 }
 
 func (c *Client) UserRegistration(ctx context.Context, request *gen.UserRegistrationRequest) (*gen.UserRegistrationResponse, error) {
-	response, err := c.client.UserRegistration(ctx, request)
-	return response, mapDependencyError(err)
-}
 
-func mapDependencyError(err error) error {
-	if err != nil && status.Code(err) == codes.Unavailable {
-		return fmt.Errorf("%w: %w", internalerrors.ErrUserDataUnavailable, err)
+	// Validate the request
+	if request == nil || request.GetMessageId() == "" {
+		return nil, fmt.Errorf("UserData registration request message_id is required")
 	}
-	return err
+	// Use the retry mechanism to call the UserRegistration RPC
+	response, err := c.client.UserRegistration(ctx, request)
+	if err = errors.MapDependencyError(err); err != nil {
+		return response, err
+	}
+
+	// Check if the response message_id matches the request message_id
+	// shouldn't happen or there's a bug in the UserData service, but we should handle it gracefully
+	if response != nil && response.GetMessageId() != request.GetMessageId() {
+		return nil, fmt.Errorf("UserData registration response message_id does not match request")
+	}
+	return response, nil
 }
 
 func (c *Client) Close() {
