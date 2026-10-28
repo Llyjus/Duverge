@@ -56,6 +56,7 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         }
 
         UserLoginResponse response = UserLoginResponse.newBuilder()
+                .setMessageId(request.getMessageId())
                 .setResult(userCheckResult)
                 .setSessionId(sessionId)
                 .build();
@@ -86,6 +87,7 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         }
 
         UserRegistrationResponse response = UserRegistrationResponse.newBuilder()
+                .setMessageId(request.getMessageId())
                 .setResult(userSetResult)
                 .build();
 
