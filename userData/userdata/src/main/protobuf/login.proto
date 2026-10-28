@@ -12,20 +12,24 @@ service UserDataService {
 }
 
 message UserRegistrationRequest {
-  string account_id = 1;
-  string password = 2;
+  string message_id = 1;
+  string account_id = 2;
+  string password = 3;
 }
 
 message UserRegistrationResponse {
-  bool result = 1;
+  string message_id = 1;
+  bool result = 2;
 }
 
 message UserLoginRequest {
-  string account_id = 1;
-  string password = 2;
+  string message_id = 1;
+  string account_id = 2;
+  string password = 3;
 }
 
 message UserLoginResponse {
-  bool result = 1;
-  string session_id = 2;
+  string message_id = 1;
+  bool result = 2;
+  string session_id = 3;
 }
