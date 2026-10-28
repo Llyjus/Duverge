@@ -38,11 +38,13 @@ type delayedRoom struct {
 
 type countedUnavailableUserData struct {
 	userdatapb.UnimplementedUserDataServiceServer
-	attempts atomic.Int32
+	attempts  atomic.Int32
+	messageID string
 }
 
-func (s *countedUnavailableUserData) UserRegistration(context.Context, *userdatapb.UserRegistrationRequest) (*userdatapb.UserRegistrationResponse, error) {
+func (s *countedUnavailableUserData) UserRegistration(_ context.Context, request *userdatapb.UserRegistrationRequest) (*userdatapb.UserRegistrationResponse, error) {
 	s.attempts.Add(1)
+	s.messageID = request.GetMessageId()
 	return nil, status.Error(codes.Unavailable, "injected unavailable error")
 }
 
@@ -58,14 +60,16 @@ func (s *countedUnavailableRoom) CreateRoom(context.Context, *roompb.CreateRoomR
 
 type intermittentlyUnavailableUserData struct {
 	userdatapb.UnimplementedUserDataServiceServer
-	attempts atomic.Int32
+	attempts   atomic.Int32
+	messageIDs chan string
 }
 
-func (s *intermittentlyUnavailableUserData) UserLogin(context.Context, *userdatapb.UserLoginRequest) (*userdatapb.UserLoginResponse, error) {
+func (s *intermittentlyUnavailableUserData) UserLogin(_ context.Context, request *userdatapb.UserLoginRequest) (*userdatapb.UserLoginResponse, error) {
+	s.messageIDs <- request.GetMessageId()
 	if s.attempts.Add(1) < 3 {
 		return nil, status.Error(codes.Unavailable, "injected temporary failure")
 	}
-	return &userdatapb.UserLoginResponse{Result: true, SessionId: "test-session"}, nil
+	return &userdatapb.UserLoginResponse{MessageId: request.GetMessageId(), Result: true, SessionId: "test-session"}, nil
 }
 
 type intermittentlyUnavailableRoom struct {
@@ -252,10 +256,13 @@ func TestGatewayDoesNotRetryNonIdempotentRPCs(t *testing.T) {
 	if got := roomService.attempts.Load(); got != 1 {
 		t.Errorf("Room create attempts = %d, want 1", got)
 	}
+	if userDataService.messageID == "" {
+		t.Error("UserData registration request has empty message_id")
+	}
 }
 
 func TestGatewayRetriesSafeRPCsOnUnavailable(t *testing.T) {
-	userDataService := &intermittentlyUnavailableUserData{}
+	userDataService := &intermittentlyUnavailableUserData{messageIDs: make(chan string, 3)}
 	userDataAddr := startGRPCServer(t, func(server *grpc.Server) {
 		userdatapb.RegisterUserDataServiceServer(server, userDataService)
 	})
@@ -282,12 +289,20 @@ func TestGatewayRetriesSafeRPCsOnUnavailable(t *testing.T) {
 	if err != nil || !loginResponse.GetResult() {
 		t.Fatalf("UserData login after retry: response=%v err=%v", loginResponse, err)
 	}
+	if loginResponse.GetMessageId() == "" {
+		t.Fatal("UserData login response has empty message_id")
+	}
 	roomResponse, err := rooms.GetRoomInfo(ctx, &roompb.GetRoomInfoRequest{})
 	if err != nil || roomResponse.GetRoomId() != "room-1" {
 		t.Fatalf("Room lookup after retry: response=%v err=%v", roomResponse, err)
 	}
 	if got := userDataService.attempts.Load(); got != 3 {
 		t.Errorf("UserData login attempts = %d, want 3", got)
+	}
+	for attempt := 0; attempt < 3; attempt++ {
+		if got := <-userDataService.messageIDs; got != loginResponse.GetMessageId() {
+			t.Errorf("attempt %d message_id = %q, want %q", attempt+1, got, loginResponse.GetMessageId())
+		}
 	}
 	if got := roomService.attempts.Load(); got != 3 {
 		t.Errorf("Room lookup attempts = %d, want 3", got)

@@ -57,6 +57,10 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 					http.Error(w, "UserData service unavailable", http.StatusServiceUnavailable)
 					return
 				}
+				if errors.Is(err, internalerrors.ErrRedisUnavailable) {
+					http.Error(w, "Redis service unavailable", http.StatusServiceUnavailable)
+					return
+				}
 				http.Error(w, "Error occurred while logging in", http.StatusInternalServerError)
 				return
 			}
@@ -77,7 +81,7 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 
 		case "register":
 			var res bool
-			res, err = register(userDataClient, r.Context(), req.Username, req.Password)
+			res, err = register(userDataClient, redisClient, r.Context(), req.Username, req.Password)
 
 			if err != nil {
 				if internalerrors.IsRequestTimeout(err) {
@@ -86,6 +90,10 @@ func HandleLogin(userDataClient *userdata.Client, redisClient *redis.Client) htt
 				}
 				if errors.Is(err, internalerrors.ErrUserDataUnavailable) {
 					http.Error(w, "UserData service unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				if errors.Is(err, internalerrors.ErrRedisUnavailable) {
+					http.Error(w, "Redis service unavailable", http.StatusServiceUnavailable)
 					return
 				}
 				http.Error(

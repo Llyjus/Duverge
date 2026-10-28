@@ -3,6 +3,7 @@ package login
 import (
 	"context"
 	"gateway/internal/client/userdata"
+	"gateway/internal/function"
 	"gateway/internal/service/auth"
 	gen "gateway/proto/userdata/gen"
 
@@ -15,8 +16,13 @@ func login(
 	ctx context.Context,
 	accountId string,
 	password string) (string, error) {
+	messageID, err := function.GenerateMessageID(ctx, redisClient)
+	if err != nil {
+		return "", err
+	}
 
 	req := &gen.UserLoginRequest{
+		MessageId: messageID,
 		AccountId: accountId,
 		Password:  password,
 	}
