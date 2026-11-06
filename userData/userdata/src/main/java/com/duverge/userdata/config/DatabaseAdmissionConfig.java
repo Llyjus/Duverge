@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.duverge.userdata.internal.Infra.LimitedDatabaseExecutor;
+import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
 
 import io.micrometer.core.instrument.MeterRegistry;
 

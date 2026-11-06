@@ -1,21 +1,23 @@
 package com.duverge.userdata.service;
 
+import java.lang.reflect.Proxy;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import com.duverge.userdata.entity.User;
-import com.duverge.userdata.internal.Infra.LimitedDatabaseExecutor;
-import com.duverge.userdata.internal.Infra.LimitedPasswordEncoder;
-import com.duverge.userdata.repository.UserRepository;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import java.time.Duration;
-import java.lang.reflect.Proxy;
-import java.util.HashMap;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import com.duverge.userdata.entity.User;
+import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
+import com.duverge.userdata.internal.infra.LimitedPasswordEncoder;
+import com.duverge.userdata.repository.UserRepository;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class UserServicePasswordMetricsTests {
     private UserRepository userRepository;

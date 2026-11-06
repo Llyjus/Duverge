@@ -2,7 +2,6 @@ package com.duverge.userdata.config;
 
 import java.time.Duration;
 
-import com.duverge.userdata.internal.Infra.LimitedPasswordEncoder;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -10,6 +9,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
+import com.duverge.userdata.internal.infra.LimitedPasswordEncoder;
 
 @Configuration
 public class SecurityConfig {

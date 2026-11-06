@@ -1,4 +1,4 @@
-package com.duverge.userdata.internal.Infra;
+package com.duverge.userdata.internal.infra;
 
 import java.time.Duration;
 import java.util.concurrent.Semaphore;

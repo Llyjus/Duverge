@@ -1,14 +1,14 @@
 package com.duverge.userdata.service;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.duverge.userdata.entity.User;
-import com.duverge.userdata.internal.Infra.LimitedDatabaseExecutor;
+import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
 import com.duverge.userdata.repository.UserRepository;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 public class UserService {

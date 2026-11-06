@@ -1,8 +1,4 @@
-package com.duverge.userdata.internal.Infra;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+package com.duverge.userdata.internal.infra;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -12,9 +8,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.duverge.userdata.error.DatabaseCapacityUnavailableException;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
+
+import com.duverge.userdata.error.DatabaseCapacityUnavailableException;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 

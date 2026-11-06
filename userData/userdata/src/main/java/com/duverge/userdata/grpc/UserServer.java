@@ -2,8 +2,8 @@ package com.duverge.userdata.grpc;
 
 import org.springframework.grpc.server.service.GrpcService;
 
-import com.duverge.userdata.error.PasswordHashUnavailableException;
 import com.duverge.userdata.error.DatabaseCapacityUnavailableException;
+import com.duverge.userdata.error.PasswordHashUnavailableException;
 import com.duverge.userdata.internal.RandomSession;
 import com.duverge.userdata.service.UserService;
 import com.example.userdata.grpc.UserDataServiceGrpc;
@@ -12,8 +12,8 @@ import com.example.userdata.grpc.UserLoginResponse;
 import com.example.userdata.grpc.UserRegistrationRequest;
 import com.example.userdata.grpc.UserRegistrationResponse;
 
-import io.grpc.stub.StreamObserver;
 import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
