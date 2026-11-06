@@ -56,6 +56,7 @@ public class LimitedPasswordEncoder implements PasswordEncoder {
         this.maxWaiters = maxWaiters;
         this.acquireTimeoutMillis = acquireTimeout.toMillis();
 
+        // Register metrics
         Gauge.builder("password.hash.active", active, AtomicInteger::get)
                 .description("BCrypt operations currently executing")
                 .register(registry);
@@ -97,6 +98,8 @@ public class LimitedPasswordEncoder implements PasswordEncoder {
         return withPermit("verify", () -> delegate.matches(rawPassword, encodedPassword));
     }
 
+    // Centralized permit acquisition and execution 
+    // for both encode and verify operations.
     <T> T withPermit(String operation, Supplier<T> action) {
         AtomicInteger operationActive = operationGauge(operation);
         AtomicInteger operationMax = operationMaxGauge(operation);
@@ -104,6 +107,8 @@ public class LimitedPasswordEncoder implements PasswordEncoder {
         long waitStarted = System.nanoTime();
         boolean acquired = permits.tryAcquire();
 
+        //If immediate acquisition fails, 
+        // attempt to acquire with timeout and bounded waiting
         if (!acquired) {
             if (!reserveWaitSlot()) {
                 waitTimer.record(System.nanoTime() - waitStarted, TimeUnit.NANOSECONDS);
@@ -123,12 +128,14 @@ public class LimitedPasswordEncoder implements PasswordEncoder {
             }
         }
 
+        // Record the wait time and check if we acquired a permit
         waitTimer.record(System.nanoTime() - waitStarted, TimeUnit.NANOSECONDS);
         if (!acquired) {
             timeoutCounter.increment();
             throw new PasswordHashUnavailableException("Timed out waiting for password hash capacity");
         }
 
+        // Increment the active count and update the maximum active count
         int activeNow = active.incrementAndGet();
         operationActive.incrementAndGet();
         activeMax.accumulateAndGet(activeNow, Math::max);
@@ -142,6 +149,8 @@ public class LimitedPasswordEncoder implements PasswordEncoder {
         }
     }
 
+    // Register gauges for hashing
+    // to monitor active and maximum simultaneous operations by type (encode/verify).
     private void registerOperationGauges(MeterRegistry registry, String operation,
             AtomicInteger current, AtomicInteger maximum) {
         Gauge.builder("password.hash.in.flight", current, AtomicInteger::get)
@@ -154,6 +163,7 @@ public class LimitedPasswordEncoder implements PasswordEncoder {
                 .register(registry);
     }
 
+    // Attempts to reserve a waiting slot for a caller.
     private boolean reserveWaitSlot() {
         if (maxWaiters == 0) {
             return false;

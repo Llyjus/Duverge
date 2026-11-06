@@ -31,6 +31,8 @@ public class LimitedDatabaseExecutor {
             int maxConcurrency,
             Duration acquireTimeout,
             int maxWaiters) {
+
+        // Check arguments before creation of the Semaphore
         if (maxConcurrency < 1) {
             throw new IllegalArgumentException("database max-concurrency must be positive");
         }
@@ -41,10 +43,15 @@ public class LimitedDatabaseExecutor {
             throw new IllegalArgumentException("database max-waiters must be zero or positive");
         }
 
+        // Create the semaphore with fairness 
+        // to ensure that waiting threads are granted permits in the order
+        // they requested them. 
+        // This prevents starvation of waiting threads.
         this.permits = new Semaphore(maxConcurrency, true);
         this.maxWaiters = maxWaiters;
         this.acquireTimeoutMillis = acquireTimeout.toMillis();
 
+        // Register metrics
         Gauge.builder("userdata.database.active", active, AtomicInteger::get)
                 .description("Database operations currently executing")
                 .register(registry);
@@ -55,6 +62,7 @@ public class LimitedDatabaseExecutor {
                 .description("Database operations waiting for an admission permit")
                 .register(registry);
 
+        // Register timers and counters for waiting time, timeouts, and queue full events
         this.waitTimer = Timer.builder("userdata.database.permit.wait")
                 .description("Time spent waiting for a database admission permit")
                 .register(registry);
@@ -66,11 +74,16 @@ public class LimitedDatabaseExecutor {
                 .register(registry);
     }
 
+    // Executes the given operation, enforcing concurrency limits and waiting timeouts.
     public <T> T execute(Supplier<T> operation) {
         long waitStarted = System.nanoTime();
+        // Attempt to acquire a permit immediately without waiting
         boolean acquired = tryAcquireImmediately();
 
+        // If immediate acquisition fails, 
+        // attempt to acquire with timeout and bounded waiting
         if (!acquired) {
+            // Increment the waiting count and check if we can reserve a waiting slot
             if (!reserveWaitSlot()) {
                 waitTimer.record(System.nanoTime() - waitStarted, TimeUnit.NANOSECONDS);
                 queueFullCounter.increment();
@@ -78,6 +91,7 @@ public class LimitedDatabaseExecutor {
             }
             try {
                 try {
+                    // Attempt to acquire a permit with timeout
                     acquired = permits.tryAcquire(acquireTimeoutMillis, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -85,26 +99,34 @@ public class LimitedDatabaseExecutor {
                     throw new DatabaseCapacityUnavailableException("Interrupted while waiting for database capacity", e);
                 }
             } finally {
+                // Decrement the waiting count regardless whether
+                // we acquired a permit or not, to ensure accurate metrics
                 waiting.decrementAndGet();
             }
         }
 
         waitTimer.record(System.nanoTime() - waitStarted, TimeUnit.NANOSECONDS);
+        // If we still haven't acquired a permit, throw an exception
         if (!acquired) {
             timeoutCounter.increment();
             throw new DatabaseCapacityUnavailableException("Timed out waiting for database capacity");
         }
 
+        // Increment the active count and update the maximum active count 
         int activeNow = active.incrementAndGet();
         activeMax.accumulateAndGet(activeNow, Math::max);
         try {
+            // Get the result
             return operation.get();
         } finally {
+            // Decrement the active count and release permit
             active.decrementAndGet();
             permits.release();
         }
     }
 
+    // Attempts to reserve a waiting slot for a caller. 
+    // Returns true if successful, false if the waiting limit is reached.
     private boolean reserveWaitSlot() {
         if (maxWaiters == 0) {
             return false;
