@@ -6,8 +6,11 @@ import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.duverge.userdata.entity.Message;
+import com.duverge.userdata.error.DatabaseConstraintClassifier;
+import com.duverge.userdata.error.DuplicateMessageIdException;
 import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
 import com.duverge.userdata.repository.MessageRepository;
 
@@ -34,9 +37,19 @@ public class MessageService {
         return timedDatabase("find_by_message_id", () -> messageRepository.findByMessageId(messageId));
     }
 
+    @Transactional
     public Message createMessage(String messageId) {
         Message message = new Message(messageId);
-        return timedDatabase("save", () -> messageRepository.save(message));
+        try {
+            // Flush here so a duplicate ID is classified at this boundary,
+            // rather than leaking out later as an ambiguous commit failure.
+            return timedDatabase("save", () -> messageRepository.saveAndFlush(message));
+        } catch (DataIntegrityViolationException e) {
+            if (DatabaseConstraintClassifier.violates(e, "uk_messages_id")) {
+                throw new DuplicateMessageIdException("Message ID has already been recorded", e);
+            }
+            throw e;
+        }
     }
 
     @Transactional

@@ -3,6 +3,7 @@ package com.duverge.userdata.grpc;
 import org.springframework.grpc.server.service.GrpcService;
 
 import com.duverge.userdata.error.DatabaseCapacityUnavailableException;
+import com.duverge.userdata.error.DuplicateMessageIdException;
 import com.duverge.userdata.error.PasswordHashUnavailableException;
 import com.duverge.userdata.internal.RandomSession;
 import com.duverge.userdata.service.UserService;
@@ -35,7 +36,7 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         boolean userCheckResult;
         try {
             userCheckResult = recordLatency("userLogin", () -> userService.checkUser(
-                    request.getAccountId(), request.getPassword()));
+                    request.getMessageId(), request.getAccountId(), request.getPassword()));
         } catch (PasswordHashUnavailableException e) {
             responseObserver.onError(Status.RESOURCE_EXHAUSTED
                     .withDescription("Password hashing capacity is temporarily exhausted")
@@ -44,6 +45,11 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         } catch (DatabaseCapacityUnavailableException e) {
             responseObserver.onError(Status.RESOURCE_EXHAUSTED
                     .withDescription("Database capacity is temporarily exhausted")
+                    .asRuntimeException());
+            return;
+        } catch (DuplicateMessageIdException e) {
+            responseObserver.onError(Status.ALREADY_EXISTS
+                    .withDescription("Message ID has already been processed")
                     .asRuntimeException());
             return;
         }
@@ -73,7 +79,7 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         boolean userSetResult;
         try {
             userSetResult = recordLatency("userRegistration", () -> userService.setNewUser(
-                    request.getAccountId(), request.getPassword()));
+                    request.getMessageId(), request.getAccountId(), request.getPassword()));
         } catch (PasswordHashUnavailableException e) {
             responseObserver.onError(Status.RESOURCE_EXHAUSTED
                     .withDescription("Password hashing capacity is temporarily exhausted")
@@ -82,6 +88,11 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         } catch (DatabaseCapacityUnavailableException e) {
             responseObserver.onError(Status.RESOURCE_EXHAUSTED
                     .withDescription("Database capacity is temporarily exhausted")
+                    .asRuntimeException());
+            return;
+        } catch (DuplicateMessageIdException e) {
+            responseObserver.onError(Status.ALREADY_EXISTS
+                    .withDescription("Message ID has already been processed")
                     .asRuntimeException());
             return;
         }
