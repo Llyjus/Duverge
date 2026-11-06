@@ -2,8 +2,10 @@ package com.duverge.userdata.service;
 
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.duverge.userdata.entity.Message;
 import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
@@ -35,6 +37,12 @@ public class MessageService {
     public Message createMessage(String messageId) {
         Message message = new Message(messageId);
         return timedDatabase("save", () -> messageRepository.save(message));
+    }
+
+    @Transactional
+    public int deleteMessagesOlderThanOneDay() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(1);
+        return timedDatabase("delete_older_than_one_day", () -> messageRepository.deleteCreatedBefore(cutoff));
     }
 
     private <T> T timedDatabase(String operation, Supplier<T> action) {
