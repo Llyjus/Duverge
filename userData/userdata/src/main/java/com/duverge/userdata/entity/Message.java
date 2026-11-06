@@ -31,18 +31,14 @@ public class Message {
     )
     private String messageId;
 
-    @Column(nullable = false)
-    private String status;
-
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     protected Message() {
     }
 
-    public Message(String messageId, String status) {
+    public Message(String messageId) {
         this.messageId = messageId;
-        this.status = status;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -52,14 +48,6 @@ public class Message {
 
     public String getMessageId() {
         return messageId;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
     }
 
     public LocalDateTime getCreatedAt() {

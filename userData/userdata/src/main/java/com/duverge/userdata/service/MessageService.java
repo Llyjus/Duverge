@@ -32,8 +32,8 @@ public class MessageService {
         return timedDatabase("find_by_message_id", () -> messageRepository.findByMessageId(messageId));
     }
 
-    public Message createMessage(String messageId, String status) {
-        Message message = new Message(messageId, status);
+    public Message createMessage(String messageId) {
+        Message message = new Message(messageId);
         return timedDatabase("save", () -> messageRepository.save(message));
     }
 
