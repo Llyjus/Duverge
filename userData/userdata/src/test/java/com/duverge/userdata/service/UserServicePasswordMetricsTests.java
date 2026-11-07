@@ -123,6 +123,10 @@ class UserServicePasswordMetricsTests {
         public String getMessageStatus(String messageId) {
             return MESSAGE_ID_UNCOMPLETED;
         }
+
+        @Override
+        public void markMessageCompleted(String messageId) {
+        }
     }
 
 }

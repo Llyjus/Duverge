@@ -44,10 +44,10 @@ class IdempotencyServiceTests {
         assertThrows(MessageIdStateException.class,
                 () -> new IdempotencyService(messageService, new StubRedisService(null))
                         .ensureNewMessageId("missing-id"));
-        assertThrows(MessageIdStateException.class,
+        assertThrows(DuplicateMessageIdException.class,
                 () -> new IdempotencyService(messageService, new StubRedisService("completed"))
                         .ensureNewMessageId("completed-id"));
-        org.junit.jupiter.api.Assertions.assertEquals(null, messageService.lastQueriedId);
+        org.junit.jupiter.api.Assertions.assertNull(messageService.lastQueriedId);
     }
 
     private static final class StubMessageService extends MessageService {
@@ -69,7 +69,7 @@ class IdempotencyServiceTests {
     }
 
     private static final class StubRedisService extends RedisService {
-        private final String status;
+        private String status;
 
         private StubRedisService(String status) {
             super(null);
@@ -79,6 +79,11 @@ class IdempotencyServiceTests {
         @Override
         public String getMessageStatus(String messageId) {
             return status;
+        }
+
+        @Override
+        public void markMessageCompleted(String messageId) {
+            status = MESSAGE_ID_COMPLETED;
         }
     }
 }

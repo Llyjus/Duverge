@@ -55,7 +55,7 @@ public class UserService {
         // a JDBC connection while it runs.
         String encodedPassword = passwordEncoder.encode(password);
         try {
-            return transactionTemplate.execute(transactionStatus -> {
+            Boolean created = transactionTemplate.execute(transactionStatus -> {
                 User concurrentlyCreated = timedDatabase(
                         "find_by_account_id", () -> userRepository.findByAccountId(accountId));
                 if (concurrentlyCreated != null) {
@@ -70,6 +70,8 @@ public class UserService {
                 messageService.createMessage(messageId);
                 return true;
             });
+            idempotencyService.markMessageCompleted(messageId);
+            return created;
         } catch (DataIntegrityViolationException e) {
             // Only the account constraint indicates a concurrent registration.
             // Other integrity errors (including Message ID conflicts) must not
@@ -113,6 +115,7 @@ public class UserService {
             messageService.createMessage(messageId);
             return null;
         });
+        idempotencyService.markMessageCompleted(messageId);
     }
 
     public User getUser(String accountId) {

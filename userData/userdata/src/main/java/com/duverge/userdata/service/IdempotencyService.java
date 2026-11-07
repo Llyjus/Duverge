@@ -26,11 +26,19 @@ public class IdempotencyService {
             throw new MessageIdStateException("Message ID is required");
         }
         String status = redisService.getMessageStatus(messageId);
+        if (RedisService.MESSAGE_ID_COMPLETED.equals(status)) {
+            throw new DuplicateMessageIdException("Message ID has already been processed", null);
+        }
         if (!RedisService.MESSAGE_ID_UNCOMPLETED.equals(status)) {
             throw new MessageIdStateException("Message ID is missing or is not uncompleted in Redis");
         }
         if (messageService.findByMessageId(messageId).isPresent()) {
             throw new DuplicateMessageIdException("Message ID has already been recorded", null);
         }
+    }
+
+    /** Updates Redis only when called after the associated database transaction commits. */
+    public void markMessageCompleted(String messageId) {
+        redisService.markMessageCompleted(messageId);
     }
 }

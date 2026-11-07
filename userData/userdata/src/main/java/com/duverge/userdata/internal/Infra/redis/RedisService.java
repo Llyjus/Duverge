@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 public class RedisService {
     public static final String MESSAGE_ID_KEY_PREFIX = "message_id:";
     public static final String MESSAGE_ID_UNCOMPLETED = "uncompleted";
+    public static final String MESSAGE_ID_COMPLETED = "completed";
 
     private final StringRedisTemplate redisTemplate;
 
@@ -25,5 +26,15 @@ public class RedisService {
     /** True only while Gateway's reservation still has the expected initial value. */
     public boolean isMessageUncompleted(String messageId) {
         return MESSAGE_ID_UNCOMPLETED.equals(getMessageStatus(messageId));
+    }
+
+    /** Marks a Gateway-reserved Message ID complete after its database work commits. */
+    public void markMessageCompleted(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("Message ID is required");
+        }
+        redisTemplate.opsForValue().set(
+                MESSAGE_ID_KEY_PREFIX + messageId,
+                MESSAGE_ID_COMPLETED);
     }
 }

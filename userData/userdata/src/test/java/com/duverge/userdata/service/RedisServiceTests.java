@@ -26,6 +26,10 @@ class RedisServiceTests {
 
         redisTemplate.status = "completed";
         assertFalse(redisService.isMessageUncompleted("request-123"));
+
+        redisService.markMessageCompleted("request-123");
+        assertEquals("message_id:request-123", redisTemplate.lastWrittenKey);
+        assertEquals("completed", redisTemplate.status);
     }
 
     @Test
@@ -41,6 +45,7 @@ class RedisServiceTests {
     private static final class StubStringRedisTemplate extends StringRedisTemplate {
         private String status;
         private String lastReadKey;
+        private String lastWrittenKey;
 
         private StubStringRedisTemplate(String status) {
             this.status = status;
@@ -56,6 +61,11 @@ class RedisServiceTests {
                         if (method.getName().equals("get")) {
                             lastReadKey = (String) args[0];
                             return status;
+                        }
+                        if (method.getName().equals("set")) {
+                            lastWrittenKey = (String) args[0];
+                            status = (String) args[1];
+                            return null;
                         }
                         if (method.getName().equals("toString")) {
                             return "StubValueOperations";

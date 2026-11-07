@@ -55,12 +55,15 @@ class UserRegistrationTransactionTests {
     private UserService userService;
     @Autowired
     private TestPasswordEncoder testPasswordEncoder;
+    @Autowired
+    private TestRedisService redisService;
 
     @BeforeEach
     void clearDatabase() {
         messageRepository.deleteAll();
         userRepository.deleteAll();
         testPasswordEncoder.reset();
+        redisService.reset();
     }
 
     @Test
@@ -73,6 +76,7 @@ class UserRegistrationTransactionTests {
         assertTrue(new BCryptPasswordEncoder().matches("secret", user.getPassword()));
         assertNotNull(message.getCreatedAt());
         assertEquals(1, messageRepository.count());
+        assertEquals(RedisService.MESSAGE_ID_COMPLETED, redisService.getMessageStatus("register-ok"));
     }
 
     @Test
@@ -86,6 +90,8 @@ class UserRegistrationTransactionTests {
         assertNull(userRepository.findByAccountId("bob"));
         assertEquals(0, userRepository.count());
         assertEquals(1, messageRepository.count());
+        assertEquals(RedisService.MESSAGE_ID_UNCOMPLETED,
+                redisService.getMessageStatus("already-used-id"));
     }
 
     @Test
@@ -97,6 +103,8 @@ class UserRegistrationTransactionTests {
 
         assertNull(userRepository.findByAccountId("alice"));
         assertTrue(messageRepository.findByMessageId("encode-failed").isEmpty());
+        assertEquals(RedisService.MESSAGE_ID_UNCOMPLETED,
+                redisService.getMessageStatus("encode-failed"));
     }
 
     @Test
@@ -106,6 +114,8 @@ class UserRegistrationTransactionTests {
         assertFalse(userService.setNewUser("register-duplicate", "alice", "another-secret"));
 
         assertNotNull(messageRepository.findByMessageId("register-duplicate").orElse(null));
+        assertEquals(RedisService.MESSAGE_ID_COMPLETED,
+                redisService.getMessageStatus("register-duplicate"));
         assertEquals(1, userRepository.count());
         assertEquals(2, messageRepository.count());
     }
@@ -121,6 +131,9 @@ class UserRegistrationTransactionTests {
         assertNotNull(messageRepository.findByMessageId("login-success").orElse(null));
         assertNotNull(messageRepository.findByMessageId("login-failure").orElse(null));
         assertNotNull(messageRepository.findByMessageId("login-missing-user").orElse(null));
+        assertEquals(RedisService.MESSAGE_ID_COMPLETED, redisService.getMessageStatus("login-success"));
+        assertEquals(RedisService.MESSAGE_ID_COMPLETED, redisService.getMessageStatus("login-failure"));
+        assertEquals(RedisService.MESSAGE_ID_COMPLETED, redisService.getMessageStatus("login-missing-user"));
         assertEquals(4, messageRepository.count());
     }
 
@@ -178,19 +191,31 @@ class UserRegistrationTransactionTests {
         }
 
         @Bean
-        RedisService redisService() {
+        TestRedisService redisService() {
             return new TestRedisService();
         }
     }
 
     static class TestRedisService extends RedisService {
+        private final java.util.concurrent.ConcurrentMap<String, String> statuses =
+                new java.util.concurrent.ConcurrentHashMap<>();
+
         TestRedisService() {
             super(null);
         }
 
         @Override
         public String getMessageStatus(String messageId) {
-            return MESSAGE_ID_UNCOMPLETED;
+            return statuses.getOrDefault(messageId, MESSAGE_ID_UNCOMPLETED);
+        }
+
+        @Override
+        public void markMessageCompleted(String messageId) {
+            statuses.put(messageId, MESSAGE_ID_COMPLETED);
+        }
+
+        void reset() {
+            statuses.clear();
         }
     }
 
