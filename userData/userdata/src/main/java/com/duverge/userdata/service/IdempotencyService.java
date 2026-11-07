@@ -6,14 +6,12 @@ import com.duverge.userdata.error.DuplicateMessageIdException;
 import com.duverge.userdata.error.MessageIdStateException;
 import com.duverge.userdata.internal.infra.redis.RedisService;
 
-/** Checks whether a request Message ID has already been recorded. */
+/** Validates request Message IDs against the Gateway-managed Redis state. */
 @Service
 public class IdempotencyService {
-    private final MessageService messageService;
     private final RedisService redisService;
 
-    public IdempotencyService(MessageService messageService, RedisService redisService) {
-        this.messageService = messageService;
+    public IdempotencyService(RedisService redisService) {
         this.redisService = redisService;
     }
 
@@ -31,9 +29,6 @@ public class IdempotencyService {
         }
         if (!RedisService.MESSAGE_ID_UNCOMPLETED.equals(status)) {
             throw new MessageIdStateException("Message ID is missing or is not uncompleted in Redis");
-        }
-        if (messageService.findByMessageId(messageId).isPresent()) {
-            throw new DuplicateMessageIdException("Message ID has already been recorded", null);
         }
     }
 

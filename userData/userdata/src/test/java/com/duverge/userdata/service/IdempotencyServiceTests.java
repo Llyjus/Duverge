@@ -1,15 +1,12 @@
 package com.duverge.userdata.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
-import com.duverge.userdata.entity.Message;
 import com.duverge.userdata.error.DuplicateMessageIdException;
 import com.duverge.userdata.error.MessageIdStateException;
 import com.duverge.userdata.internal.infra.redis.RedisService;
@@ -17,59 +14,48 @@ import com.duverge.userdata.internal.infra.redis.RedisService;
 class IdempotencyServiceTests {
 
     @Test
-    void allowsAnUnseenMessageId() {
-        StubMessageService messageService = new StubMessageService();
-        IdempotencyService idempotencyService = new IdempotencyService(messageService,
-                new StubRedisService(RedisService.MESSAGE_ID_UNCOMPLETED));
+    void allowsAnUncompletedMessageIdFromRedis() {
+        StubRedisService redisService = new StubRedisService(RedisService.MESSAGE_ID_UNCOMPLETED);
+        IdempotencyService idempotencyService = new IdempotencyService(redisService);
 
         assertDoesNotThrow(() -> idempotencyService.ensureNewMessageId("new-id"));
-        org.junit.jupiter.api.Assertions.assertEquals("new-id", messageService.lastQueriedId);
+        assertEquals("new-id", redisService.lastReadId);
     }
 
     @Test
-    void rejectsAnAlreadyRecordedMessageIdWithTheTypedError() {
-        StubMessageService messageService = new StubMessageService("used-id");
-        IdempotencyService idempotencyService = new IdempotencyService(messageService,
-                new StubRedisService(RedisService.MESSAGE_ID_UNCOMPLETED));
+    void rejectsACompletedMessageIdAsAlreadyProcessed() {
+        StubRedisService redisService = new StubRedisService(RedisService.MESSAGE_ID_COMPLETED);
+        IdempotencyService idempotencyService = new IdempotencyService(redisService);
 
         assertThrows(DuplicateMessageIdException.class,
-                () -> idempotencyService.ensureNewMessageId("used-id"));
-        org.junit.jupiter.api.Assertions.assertEquals("used-id", messageService.lastQueriedId);
+                () -> idempotencyService.ensureNewMessageId("completed-id"));
+        assertEquals("completed-id", redisService.lastReadId);
     }
 
     @Test
-    void rejectsMessageIdsMissingFromRedisOrNotInUncompletedState() {
-        StubMessageService messageService = new StubMessageService();
+    void rejectsMissingOrUnknownRedisStates() {
+        StubRedisService redisService = new StubRedisService(null);
+        IdempotencyService idempotencyService = new IdempotencyService(redisService);
 
         assertThrows(MessageIdStateException.class,
-                () -> new IdempotencyService(messageService, new StubRedisService(null))
-                        .ensureNewMessageId("missing-id"));
-        assertThrows(DuplicateMessageIdException.class,
-                () -> new IdempotencyService(messageService, new StubRedisService("completed"))
-                        .ensureNewMessageId("completed-id"));
-        org.junit.jupiter.api.Assertions.assertNull(messageService.lastQueriedId);
+                () -> idempotencyService.ensureNewMessageId("missing-id"));
+        assertThrows(MessageIdStateException.class,
+                () -> new IdempotencyService(new StubRedisService("unexpected"))
+                        .ensureNewMessageId("unknown-state-id"));
     }
 
-    private static final class StubMessageService extends MessageService {
-        private final Set<String> existingIds = new HashSet<>();
-        private String lastQueriedId;
+    @Test
+    void rejectsBlankMessageIdWithoutQueryingRedis() {
+        StubRedisService redisService = new StubRedisService(RedisService.MESSAGE_ID_UNCOMPLETED);
 
-        private StubMessageService(String... existingIds) {
-            super(null, null, null);
-            this.existingIds.addAll(Set.of(existingIds));
-        }
-
-        @Override
-        public Optional<Message> findByMessageId(String messageId) {
-            lastQueriedId = messageId;
-            return existingIds.contains(messageId)
-                    ? Optional.of(new Message(messageId))
-                    : Optional.empty();
-        }
+        assertThrows(MessageIdStateException.class,
+                () -> new IdempotencyService(redisService).ensureNewMessageId(" "));
+        assertNull(redisService.lastReadId);
     }
 
     private static final class StubRedisService extends RedisService {
-        private String status;
+        private final String status;
+        private String lastReadId;
 
         private StubRedisService(String status) {
             super(null);
@@ -78,12 +64,8 @@ class IdempotencyServiceTests {
 
         @Override
         public String getMessageStatus(String messageId) {
+            lastReadId = messageId;
             return status;
-        }
-
-        @Override
-        public void markMessageCompleted(String messageId) {
-            status = MESSAGE_ID_COMPLETED;
         }
     }
 }

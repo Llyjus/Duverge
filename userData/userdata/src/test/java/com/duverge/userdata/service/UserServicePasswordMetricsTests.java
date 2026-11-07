@@ -67,7 +67,7 @@ class UserServicePasswordMetricsTests {
                 new LimitedDatabaseExecutor(meterRegistry, 10, Duration.ofSeconds(1), 10));
         userService = new UserService(userRepository, meterRegistry, passwordEncoder,
                 new LimitedDatabaseExecutor(meterRegistry, 10, Duration.ofSeconds(1), 10), messageService,
-                new IdempotencyService(messageService, new TestRedisService()), new TestTransactionManager());
+                new IdempotencyService(new TestRedisService()), new TestTransactionManager());
     }
 
     @Test
