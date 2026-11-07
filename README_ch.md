@@ -860,6 +860,49 @@ Room 使用 Redis `WATCH`/事务更新 `room:<roomId>` 和相关 `user_status:<u
 | `session_account:<accountId>` | String | 7 天 | Gateway | Gateway |
 | `user_status:<userId>` | JSON String | 创建时 30 秒；Room 更新后通常永久 | Gateway/Room | Gateway/Room |
 | `room:<roomId>` | JSON String | 永久 | Room | Gateway/Room |
+| `message_id:<uuid>` | String（`uncompleted` / `completed`） | 无过期时间 | Gateway 创建、UserData 更新 | UserData |
+
+### UserData Message ID 状态与事务流程
+
+Gateway 收到注册或登录请求后，为这次 gRPC 操作生成 UUID，并用 Redis `SET NX` 原子预留：
+
+```text
+key:   message_id:<uuid>
+value: uncompleted
+TTL:   无
+```
+
+Gateway 把同一个 ID 放进 UserData 的 gRPC 请求。请求到达后，`UserService` 先调用 `IdempotencyService` 读取 Redis，再查询用户或执行 BCrypt：
+
+| Redis 状态 | UserData 行为 | gRPC 结果 |
+|---|---|---|
+| `uncompleted` | 允许继续处理 | 处理后返回正常响应；例如密码错误仍可能是 `result=false` |
+| `completed` | 拒绝重复处理 | `ALREADY_EXISTS` |
+| key 不存在、ID 为空或其他状态 | 拒绝无效状态 | `FAILED_PRECONDITION` |
+
+注册流程：
+
+1. 先检查账号是否已存在。若已存在，UserData 在 MySQL 事务中只写入 `messages` 记录，提交后把 Redis 状态改为 `completed`，并返回 `result=false`。
+2. 若账号不存在，在打开数据库事务前执行 BCrypt。
+3. 在同一个 MySQL 事务中再次检查账号，并写入 `users` 和 `messages` 两条记录。
+4. MySQL 事务提交成功后，UserData 把 `message_id:<uuid>` 的 value 从 `uncompleted` 改为 `completed`，再返回结果。
+
+并发注册同一账号时，由 `uk_users_account_id` 唯一约束兜底；只有确认是这个账号约束冲突，才按账号已存在处理。Message ID 的冲突不会被误判为账号重复。
+
+登录流程：
+
+1. 验证 Redis 中的 Message ID 状态，然后查询账号并执行 BCrypt。
+2. 无论密码正确、密码错误还是账号不存在，只要校验流程正常完成，UserData 都会在 MySQL 事务中记录该 Message ID。
+3. MySQL 提交成功后，将 Redis 状态更新为 `completed`。
+4. 只有登录成功时，UserData 才生成 session ID；Gateway 收到响应后再单独写入 session Redis key。
+
+若 Message ID 缺失或 Redis 状态不合法，请求会在用户查询和 BCrypt 前失败。BCrypt、数据库操作或事务提交失败时，不会标记为 `completed`；事务回滚时，`users`/`messages` 的写入也会一起回滚，Redis 保持 `uncompleted`。重复 ID 若在并发时都读到了 `uncompleted`，数据库 `uk_messages_id` 唯一约束负责最终拦截；注册事务因 Message 写入冲突失败时，新用户也会回滚。
+
+MySQL 提交与 Redis 状态更新不是一个分布式事务。如果 MySQL 已提交、随后 Redis 更新失败，数据库操作已经完成，但 Redis 可能仍是 `uncompleted`。此时重试不会重放第一次响应，数据库唯一约束会阻止重复插入。
+
+当前 `messages` 表只保存唯一 Message ID 和创建时间，不保存业务响应或登录 session。因此 `completed` 的重复请求会返回 gRPC `ALREADY_EXISTS`，不会返回第一次的结果；这提供了重复执行保护，还不是完整的响应重放式幂等。Gateway 对 UserData 登录的 `UNAVAILABLE` 会用同一个 Message ID 重试；若第一次其实已经提交、只是响应丢失，重试会遇到 `ALREADY_EXISTS`。Gateway 当前没有为 `ALREADY_EXISTS` 或 `FAILED_PRECONDITION` 设置专门的 HTTP 映射，会走通用错误响应。
+
+Message ID Redis key 当前没有 TTL。MySQL 中删除一天前 Message 记录的方法未被定时调用，也不会删除 Redis key；因此 `completed` ID 会一直留在 Redis，除非单独清理。
 
 ## MySQL 数据字典
 
@@ -876,7 +919,18 @@ Room 使用 Redis `WATCH`/事务更新 `room:<roomId>` 和相关 `user_status:<u
 | `account_id` | VARCHAR（JPA 默认命名策略） | 用户登录账号，代码通过 `findByAccountId` 查询 |
 | `password` | VARCHAR | BCrypt 哈希，不保存明文密码 |
 
-当前 UserData 只通过 gRPC 暴露注册和登录，不提供用户查询、修改密码或删除用户的公开 API。
+### `messages`
+
+实体：`com.duverge.userdata.entity.Message`
+表名：`messages`
+
+| 列 | 类型/属性 | 说明 |
+|---|---|---|
+| `id` | BIGINT，自增，主键 | JPA `IDENTITY` 主键 |
+| `message_id` | VARCHAR，唯一约束 `uk_messages_id` | Gateway 为每个注册/登录 gRPC 请求生成的 UUID |
+| `created_at` | DATETIME | 该请求 Message 记录的创建时间 |
+
+`MessageService` 提供删除一天前记录的方法，但当前代码没有自动调度或调用该清理方法。当前 UserData 只通过 gRPC 暴露注册和登录，不提供用户查询、修改密码或删除用户的公开 API。
 
 ## MySQL 连接池与查询超时
 

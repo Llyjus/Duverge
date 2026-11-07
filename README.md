@@ -357,12 +357,43 @@ UserData RPCs are `UserRegistration` and `UserLogin`, defined in [`proto/user_in
 | `session_account:<accountId>` | `session:<sessionId>` | 7 days |
 | `user_status:<userId>` | User ID and status JSON | Initially 30 seconds; heartbeat renews it |
 | `room:<roomId>` | Room JSON | No expiration; deleted when the room becomes empty |
+| `message_id:<uuid>` | `uncompleted` or `completed` | No expiration |
 
 User statuses include `in_lobby`, `in_room` and `in_game`. Room statuses include `waiting`, `in_game` and `finished`.
 
+### UserData Message ID workflow
+
+Gateway creates a UUID for each registration or login request and reserves it with Redis `SET NX`:
+
+```text
+key:   message_id:<uuid>
+value: uncompleted
+TTL:   none
+```
+
+Gateway sends that same ID in the UserData gRPC request. Before looking up the user or running BCrypt, `UserService` asks `IdempotencyService` to read the Redis key:
+
+| Redis state | UserData behavior | gRPC result |
+|---|---|---|
+| `uncompleted` | Continue the operation | Normal response if processing succeeds; business outcomes such as bad credentials may still be `result=false` |
+| `completed` | Reject it as already processed | `ALREADY_EXISTS` |
+| Key missing, blank ID, or any other value | Reject the invalid state | `FAILED_PRECONDITION` |
+
+For a new registration, UserData hashes the password before opening the database transaction. It then inserts the user and the `messages` row in one MySQL transaction. If the account already exists, it records the request Message ID in a transaction and returns `result=false`. A concurrent account insert is resolved by the unique `uk_users_account_id` constraint; only that constraint is treated as an account conflict.
+
+For login, UserData looks up the account and verifies the password, then records the Message ID in a short MySQL transaction. A valid password, invalid password, or missing account are completed login checks and are recorded; a successful login response then receives a session ID, which Gateway stores separately in Redis.
+
+After the MySQL transaction commits, UserData changes the Redis value to `completed`. It does not mark the ID complete when validation, BCrypt, or the database transaction fails. If the transaction rolls back, its `messages` row is rolled back too and the Redis value remains `uncompleted`.
+
+The `messages.message_id` column has the unique constraint `uk_messages_id`. Redis provides the request-state check; MySQL remains the final guard if concurrent requests both observe `uncompleted`. A duplicate database Message ID is reported by UserData as `ALREADY_EXISTS`, and a registration transaction that cannot insert its Message row also rolls back the new user.
+
+The MySQL commit and Redis status update are separate operations, not one distributed transaction. If MySQL commits and the subsequent Redis update fails, the database operation is already recorded while Redis may still say `uncompleted`. Also, `completed` requests are rejected rather than receiving the original response: the current Message table stores only the ID and creation time, not a response or login session. Therefore this is duplicate execution protection, not response replay. Gateway retries UserData login on `UNAVAILABLE` using the same request ID; if the first attempt committed but its response was lost, the retry can receive `ALREADY_EXISTS` instead of the original login response. The current HTTP handler maps this and `FAILED_PRECONDITION` to its generic error response.
+
+Message ID keys have no TTL. The one-day MySQL Message cleanup method is not scheduled and does not delete these Redis keys, so completed IDs remain in Redis until removed separately.
+
 ### MySQL
 
-The `users` table stores an auto-increment ID, unique account ID and BCrypt password hash. JPA currently uses `ddl-auto: update` for development; production should use managed schema migrations. UserData uses `MYSQL_DATABASE`, `MYSQL_USER` and `MYSQL_PASSWORD` from Compose.
+The `users` table stores an auto-increment ID, unique account ID and BCrypt password hash. The `messages` table stores a unique Message ID and its creation time for registration/login transaction tracking. `MessageService` has a method to delete records older than one day, but the current code does not schedule or call it automatically. JPA currently uses `ddl-auto: update` for development; production should use managed schema migrations. UserData uses `MYSQL_DATABASE`, `MYSQL_USER` and `MYSQL_PASSWORD` from Compose.
 
 ## MySQL pool and query timeouts
 
