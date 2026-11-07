@@ -18,10 +18,12 @@ func (s *RoomServer) CreateRoom(
 		metrics.RequestDuration.WithLabelValues("room", "create_room", "total").Observe(time.Since(started).Seconds())
 	}()
 
-	roomID, err := service.CreateRoom(
-		s.client,
-		req.GetUserId(),
-	)
+	var roomID string
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		var operationErr error
+		roomID, operationErr = service.CreateRoom(s.client, req.GetUserId())
+		return operationErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -36,11 +38,9 @@ func (s *RoomServer) JoinRoom(
 	req *pb.JoinRoomRequest,
 ) (*pb.JoinRoomResponse, error) {
 
-	err := service.AddUserToRoom(
-		s.client,
-		req.GetRoomId(),
-		req.GetUserId(),
-	)
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		return service.AddUserToRoom(s.client, req.GetRoomId(), req.GetUserId())
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -55,11 +55,9 @@ func (s *RoomServer) LeaveRoom(
 	req *pb.LeaveRoomRequest,
 ) (*pb.LeaveRoomResponse, error) {
 
-	err := service.DeleteUserFromRoom(
-		s.client,
-		req.GetRoomId(),
-		req.GetUserId(),
-	)
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		return service.DeleteUserFromRoom(s.client, req.GetRoomId(), req.GetUserId())
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +91,9 @@ func (s *RoomServer) SetPreparation(
 	req *pb.SetPreparationRequest,
 ) (*pb.SetPreparationResponse, error) {
 
-	err := service.SetUserPreparation(
-		s.client,
-		req.GetRoomId(),
-		req.GetUserId(),
-		req.GetTargetStatus(),
-	)
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		return service.SetUserPreparation(s.client, req.GetRoomId(), req.GetUserId(), req.GetTargetStatus())
+	})
 	if err != nil {
 		return nil, err
 	}

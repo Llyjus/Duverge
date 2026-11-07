@@ -36,7 +36,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		case "createRoom":
 			var res string
-			res, err = createRoom(roomClient, r.Context(), userId)
+			res, err = createRoom(roomClient, r.Context(), userId, redisClient)
 
 			if err != nil {
 				http.Error(w, "Error occurred while getting room", http.StatusInternalServerError)

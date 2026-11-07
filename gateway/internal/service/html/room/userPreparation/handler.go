@@ -38,7 +38,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		case "setPreparation":
 			var res bool
-			res, err = setPreparation(roomClient, r.Context(), req.RoomID, userId, req.TargetStatus)
+			res, err = setPreparation(roomClient, r.Context(), req.RoomID, userId, req.TargetStatus, redisClient)
 
 			if err != nil {
 				http.Error(w, "Error occurred while getting room", http.StatusInternalServerError)

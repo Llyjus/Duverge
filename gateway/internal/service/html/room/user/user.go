@@ -3,17 +3,25 @@ package user
 import (
 	"context"
 	"gateway/internal/client/room"
+	"gateway/internal/function"
 	gen "gateway/proto/room/gen"
+	redis "github.com/redis/go-redis/v9"
 )
 
 func createRoom(
 	roomClient *room.Client,
 	ctx context.Context,
-	userId string) (
+	userId string,
+	redisClient *redis.Client) (
 	string,
 	error) {
+	messageID, err := function.GenerateMessageID(ctx, redisClient)
+	if err != nil {
+		return "", err
+	}
 	req := &gen.CreateRoomRequest{
-		UserId: userId,
+		UserId:    userId,
+		MessageId: messageID,
 	}
 
 	res, err := roomClient.GetClient().CreateRoom(

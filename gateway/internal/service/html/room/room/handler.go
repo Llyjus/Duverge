@@ -58,7 +58,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		case "joinRoom":
 			var res bool
-			res, err = joinRoom(roomClient, r.Context(), req.RoomID, userId)
+			res, err = joinRoom(roomClient, r.Context(), req.RoomID, userId, redisClient)
 
 			if err != nil {
 				http.Error(w, "Error occurred while joining room", http.StatusInternalServerError)
@@ -78,7 +78,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		case "leaveRoom":
 			var res bool
-			res, err = leaveRoom(roomClient, r.Context(), req.RoomID, userId)
+			res, err = leaveRoom(roomClient, r.Context(), req.RoomID, userId, redisClient)
 
 			if err != nil {
 				http.Error(w, "Error occurred while leaving room", http.StatusInternalServerError)
@@ -98,7 +98,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		case "startGame":
 			var res bool
-			res, err = startGame(roomClient, r.Context(), req.RoomID, userId)
+			res, err = startGame(roomClient, r.Context(), req.RoomID, userId, redisClient)
 
 			if err != nil {
 				http.Error(w, "Error occurred while starting game", http.StatusInternalServerError)

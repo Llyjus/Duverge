@@ -3,7 +3,9 @@ package room
 import (
 	"context"
 	"gateway/internal/client/room"
+	"gateway/internal/function"
 	gen "gateway/proto/room/gen"
+	redis "github.com/redis/go-redis/v9"
 )
 
 func getRoomInfo(
@@ -33,12 +35,18 @@ func joinRoom(
 	ctx context.Context,
 	roomID string,
 	userId string,
+	redisClient *redis.Client,
 ) (
 	bool,
 	error) {
+	messageID, err := function.GenerateMessageID(ctx, redisClient)
+	if err != nil {
+		return false, err
+	}
 	req := &gen.JoinRoomRequest{
-		RoomId: roomID,
-		UserId: userId,
+		RoomId:    roomID,
+		UserId:    userId,
+		MessageId: messageID,
 	}
 
 	res, err := roomClient.GetClient().JoinRoom(
@@ -58,12 +66,18 @@ func leaveRoom(
 	ctx context.Context,
 	roomID string,
 	userId string,
+	redisClient *redis.Client,
 ) (
 	bool,
 	error) {
+	messageID, err := function.GenerateMessageID(ctx, redisClient)
+	if err != nil {
+		return false, err
+	}
 	req := &gen.LeaveRoomRequest{
-		RoomId: roomID,
-		UserId: userId,
+		RoomId:    roomID,
+		UserId:    userId,
+		MessageId: messageID,
 	}
 
 	res, err := roomClient.GetClient().LeaveRoom(
@@ -82,12 +96,18 @@ func startGame(
 	roomClient *room.Client,
 	ctx context.Context,
 	roomID string,
-	userID string) (
+	userID string,
+	redisClient *redis.Client) (
 	bool,
 	error) {
+	messageID, err := function.GenerateMessageID(ctx, redisClient)
+	if err != nil {
+		return false, err
+	}
 	req := &gen.StartGameRequest{
-		RoomId: roomID,
-		UserId: userID,
+		RoomId:    roomID,
+		UserId:    userID,
+		MessageId: messageID,
 	}
 
 	res, err := roomClient.GetClient().StartGame(

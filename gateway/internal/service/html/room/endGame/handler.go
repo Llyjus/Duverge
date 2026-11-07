@@ -31,7 +31,7 @@ func HandleRoom(roomClient *room.Client, redisClient *redis.Client) http.Handler
 
 		case "endGame":
 			var res bool
-			res, err = EndGame(roomClient, r.Context(), req.RoomID)
+			res, err = EndGame(roomClient, r.Context(), req.RoomID, redisClient)
 
 			if err != nil {
 				http.Error(w, "Error occurred while ending game", http.StatusInternalServerError)

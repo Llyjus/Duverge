@@ -12,11 +12,9 @@ func (s *RoomServer) StartGame(
 	req *pb.StartGameRequest,
 ) (*pb.StartGameResponse, error) {
 
-	err := service.StartRoomGame(
-		s.client,
-		req.GetRoomId(),
-		req.GetUserId(),
-	)
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		return service.StartRoomGame(s.client, req.GetRoomId(), req.GetUserId())
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -31,10 +29,9 @@ func (s *RoomServer) EndGame(
 	req *pb.EndGameRequest,
 ) (*pb.EndGameResponse, error) {
 
-	err := service.EndRoomGame(
-		s.client,
-		req.GetRoomId(),
-	)
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		return service.EndRoomGame(s.client, req.GetRoomId())
+	})
 	if err != nil {
 		return nil, err
 	}

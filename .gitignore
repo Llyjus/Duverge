@@ -9,6 +9,8 @@ mysql/
 
 #### go proto generate ###
 *.pb.go
+!gateway/proto/room/gen/*.pb.go
+!room/proto/gen/*.pb.go
 
 ### STS ###
 .apt_generated
