@@ -705,7 +705,7 @@ GATEWAY_TCP_WRITE_TIMEOUT=5s
 docker compose up -d --build gateway
 ```
 
-Gateway 对 UserData 登录和 Room 信息查询遇到 `UNAVAILABLE` 时重试；这两种操作可以安全重复。默认间隔为 200ms，最多尝试 3 次（包含首次调用），并受原请求的 context deadline 限制。注册和房间状态变更不会自动重试，因为响应丢失时第一次写操作可能已经成功，重复执行可能改变结果或创建重复状态。`DEADLINE_EXCEEDED` 和其他状态码不会触发重试。
+Gateway 对 UserData 登录和 Room 信息查询遇到 `UNAVAILABLE` 时重试；这两种操作可以安全重复。默认间隔为 200ms，最多尝试 3 次（包含首次调用），并受原请求的 context deadline 限制。注册和房间状态变更不会自动重试。Room 变更请求带有 Message ID 状态校验，但每个新的 HTTP 请求都会生成新 ID，因此不能去重 HTTP 客户端重试。`DEADLINE_EXCEEDED` 和其他状态码不会触发重试。
 
 ## 密码哈希并发限制
 
@@ -761,6 +761,8 @@ Proto：[`proto/room/room_4_gateway.proto`](proto/room/room_4_gateway.proto)
 | `SetPreparation` | 设置/取消准备 |
 | `StartGame` | 房主在所有成员准备后开始游戏 |
 | `EndGame` | 结束游戏并恢复 waiting 状态 |
+
+除只读的 `GetRoomInfo` 外，所有变更 RPC 请求都带有 `message_id`，并按 Redis 中的 `uncompleted`/`completed` 状态校验。详细流程和当前限制见 [Room Message ID 状态流程](#room-message-id-状态流程)。
 
 ## Redis 数据字典
 
@@ -860,7 +862,7 @@ Room 使用 Redis `WATCH`/事务更新 `room:<roomId>` 和相关 `user_status:<u
 | `session_account:<accountId>` | String | 7 天 | Gateway | Gateway |
 | `user_status:<userId>` | JSON String | 创建时 30 秒；Room 更新后通常永久 | Gateway/Room | Gateway/Room |
 | `room:<roomId>` | JSON String | 永久 | Room | Gateway/Room |
-| `message_id:<uuid>` | String（`uncompleted` / `completed`） | 无过期时间 | Gateway 创建、UserData 更新 | UserData |
+| `message_id:<uuid>` | String（`uncompleted` / `completed`） | 无过期时间 | Gateway 创建、UserData/Room 更新 | UserData/Room |
 
 ### UserData Message ID 状态与事务流程
 
@@ -903,6 +905,23 @@ MySQL 提交与 Redis 状态更新不是一个分布式事务。如果 MySQL 已
 当前 `messages` 表只保存唯一 Message ID 和创建时间，不保存业务响应或登录 session。因此 `completed` 的重复请求会返回 gRPC `ALREADY_EXISTS`，不会返回第一次的结果；这提供了重复执行保护，还不是完整的响应重放式幂等。Gateway 对 UserData 登录的 `UNAVAILABLE` 会用同一个 Message ID 重试；若第一次其实已经提交、只是响应丢失，重试会遇到 `ALREADY_EXISTS`。Gateway 当前没有为 `ALREADY_EXISTS` 或 `FAILED_PRECONDITION` 设置专门的 HTTP 映射，会走通用错误响应。
 
 Message ID Redis key 当前没有 TTL。MySQL 中删除一天前 Message 记录的方法未被定时调用，也不会删除 Redis key；因此 `completed` ID 会一直留在 Redis，除非单独清理。
+
+### Room Message ID 状态流程
+
+Gateway 调用 Room 的变更 RPC 前，会生成 UUID，并通过共享 Redis 的 `SET NX` 预留 `message_id:<uuid>`，初始值为 `uncompleted`，再把同一个 ID 放入 Room gRPC 请求。直接调用 Room gRPC 的客户端也必须先按此方式预留 key；Redis 中没有该 key 时，Room 会拒绝请求。
+
+Room service 层的 `IdempotencyService` 在执行业务操作前检查状态：
+
+| Redis 状态 | Room 行为 | gRPC 结果 |
+|---|---|---|
+| `uncompleted` | 执行变更；操作成功后改为 `completed` | 正常 RPC 响应 |
+| `completed` | 拒绝重复 ID | `ALREADY_EXISTS` |
+| key 不存在、ID 为空或其他状态 | 不执行变更 | `FAILED_PRECONDITION` |
+| Redis 不可用 | 不执行变更，或报告完成状态写入失败 | `UNAVAILABLE` |
+
+该流程覆盖创建房间、加入、离开、设置准备状态、开始游戏和结束游戏。`GetRoomInfo` 是只读操作，不使用 Message ID。Room 业务操作返回错误时，ID 保持 `uncompleted`。
+
+状态读取、Room 操作和写入 `completed` 是分开的步骤，并非一个原子操作。两个携带同一 `uncompleted` ID 的并发请求可能同时通过检查并执行；如果 Room 操作成功但写入 `completed` 失败，Redis 仍可能是 `uncompleted`，重试时可能再次执行。已完成的请求会被拒绝，Room 不保存或重放第一次的响应。Gateway 每次收到新的 HTTP 请求都会生成新的 ID，因此 HTTP 客户端重试不会被这个机制去重。Gateway 当前也不会自动重试 Room 变更 RPC。
 
 ## MySQL 数据字典
 

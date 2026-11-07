@@ -339,13 +339,15 @@ Recreate Gateway to apply changes:
 docker compose up -d --build gateway
 ```
 
-Gateway retries `UNAVAILABLE` for UserData login and Room info lookup, which are safe to repeat. The delay defaults to 200 ms and the maximum is 3 total attempts, within the original request context deadline. Registration and room mutations are not automatically retried because a lost response can follow a successful write and repeating it can change the result or create duplicate state. `DEADLINE_EXCEEDED` and other status codes are not retried.
+Gateway retries `UNAVAILABLE` for UserData login and Room info lookup, which are safe to repeat. The delay defaults to 200 ms and the maximum is 3 total attempts, within the original request context deadline. Registration and room mutations are not automatically retried. Room mutations carry a Message ID for duplicate-state checking, but a new HTTP request currently gets a new ID, so this does not deduplicate client retries. `DEADLINE_EXCEEDED` and other status codes are not retried.
 
 ## gRPC services
 
 Gateway connects to UserData at `userdata:26529` and Room at `room:26528` inside Compose.
 
 UserData RPCs are `UserRegistration` and `UserLogin`, defined in [`proto/user_info/login.proto`](proto/user_info/login.proto). Room RPCs are `GetRoomInfo`, `CreateRoom`, `JoinRoom`, `LeaveRoom`, `SetPreparation`, `StartGame` and `EndGame`, defined in [`proto/room/room_4_gateway.proto`](proto/room/room_4_gateway.proto).
+
+Room mutation RPCs (`CreateRoom`, `JoinRoom`, `LeaveRoom`, `SetPreparation`, `StartGame` and `EndGame`) carry a `message_id`. `GetRoomInfo` is read-only and does not use one. See [Room Message ID workflow](#room-message-id-workflow) for the Redis state flow and its current limits.
 
 ## Storage
 
@@ -390,6 +392,23 @@ The `messages.message_id` column has the unique constraint `uk_messages_id`. Red
 The MySQL commit and Redis status update are separate operations, not one distributed transaction. If MySQL commits and the subsequent Redis update fails, the database operation is already recorded while Redis may still say `uncompleted`. Also, `completed` requests are rejected rather than receiving the original response: the current Message table stores only the ID and creation time, not a response or login session. Therefore this is duplicate execution protection, not response replay. Gateway retries UserData login on `UNAVAILABLE` using the same request ID; if the first attempt committed but its response was lost, the retry can receive `ALREADY_EXISTS` instead of the original login response. The current HTTP handler maps this and `FAILED_PRECONDITION` to its generic error response.
 
 Message ID keys have no TTL. The one-day MySQL Message cleanup method is not scheduled and does not delete these Redis keys, so completed IDs remain in Redis until removed separately.
+
+### Room Message ID workflow
+
+Before sending a Room mutation RPC, Gateway generates a UUID and reserves `message_id:<uuid>` in the shared Redis with `SET NX` and value `uncompleted`. It sends the same ID in the Room gRPC request. Direct Room gRPC callers must reserve the key this way before calling a mutation; a missing key is rejected.
+
+The Room service's `IdempotencyService` checks Redis before running the operation:
+
+| Redis state | Room behavior | gRPC result |
+|---|---|---|
+| `uncompleted` | Run the mutation; set the value to `completed` after it succeeds | Normal RPC response |
+| `completed` | Reject the repeated ID | `ALREADY_EXISTS` |
+| Key missing, blank ID, or any other value | Do not run the mutation | `FAILED_PRECONDITION` |
+| Redis unavailable | Do not run the mutation, or report completion-write failure | `UNAVAILABLE` |
+
+This applies to create, join, leave, preparation, start-game and end-game operations. Room info lookup is read-only and does not use Message IDs. If the Room operation returns an error, the ID remains `uncompleted`.
+
+The state read, Room operation and `completed` write are separate steps, not an atomic claim. Two concurrent requests carrying the same `uncompleted` ID can both pass the check and execute. If the Room mutation succeeds but writing `completed` fails, Redis can remain `uncompleted`, so a retry may execute again. Completed requests are rejected; Room does not store or replay the first response. Gateway generates a fresh ID for each new HTTP request, so retrying the HTTP request is not deduplicated by this mechanism. Gateway does not automatically retry Room mutations.
 
 ### MySQL
 
