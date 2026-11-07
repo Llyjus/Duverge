@@ -4,6 +4,7 @@ import org.springframework.grpc.server.service.GrpcService;
 
 import com.duverge.userdata.error.DatabaseCapacityUnavailableException;
 import com.duverge.userdata.error.DuplicateMessageIdException;
+import com.duverge.userdata.error.MessageIdStateException;
 import com.duverge.userdata.error.PasswordHashUnavailableException;
 import com.duverge.userdata.internal.RandomSession;
 import com.duverge.userdata.service.UserService;
@@ -52,6 +53,11 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
                     .withDescription("Message ID has already been processed")
                     .asRuntimeException());
             return;
+        } catch (MessageIdStateException e) {
+            responseObserver.onError(Status.FAILED_PRECONDITION
+                    .withDescription(e.getMessage())
+                    .asRuntimeException());
+            return;
         }
         
         var sessionId = "";
@@ -93,6 +99,11 @@ public class UserServer extends UserDataServiceGrpc.UserDataServiceImplBase {
         } catch (DuplicateMessageIdException e) {
             responseObserver.onError(Status.ALREADY_EXISTS
                     .withDescription("Message ID has already been processed")
+                    .asRuntimeException());
+            return;
+        } catch (MessageIdStateException e) {
+            responseObserver.onError(Status.FAILED_PRECONDITION
+                    .withDescription(e.getMessage())
                     .asRuntimeException());
             return;
         }

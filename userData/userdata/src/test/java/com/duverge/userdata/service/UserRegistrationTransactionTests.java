@@ -31,6 +31,7 @@ import com.duverge.userdata.entity.Message;
 import com.duverge.userdata.entity.User;
 import com.duverge.userdata.error.DuplicateMessageIdException;
 import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
+import com.duverge.userdata.internal.infra.redis.RedisService;
 import com.duverge.userdata.repository.MessageRepository;
 import com.duverge.userdata.repository.UserRepository;
 
@@ -174,6 +175,22 @@ class UserRegistrationTransactionTests {
         @Bean
         TestPasswordEncoder passwordEncoder() {
             return new TestPasswordEncoder();
+        }
+
+        @Bean
+        RedisService redisService() {
+            return new TestRedisService();
+        }
+    }
+
+    static class TestRedisService extends RedisService {
+        TestRedisService() {
+            super(null);
+        }
+
+        @Override
+        public String getMessageStatus(String messageId) {
+            return MESSAGE_ID_UNCOMPLETED;
         }
     }
 

@@ -20,6 +20,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import com.duverge.userdata.entity.User;
 import com.duverge.userdata.internal.infra.LimitedDatabaseExecutor;
 import com.duverge.userdata.internal.infra.LimitedPasswordEncoder;
+import com.duverge.userdata.internal.infra.redis.RedisService;
 import com.duverge.userdata.repository.UserRepository;
 import com.duverge.userdata.repository.MessageRepository;
 
@@ -66,7 +67,7 @@ class UserServicePasswordMetricsTests {
                 new LimitedDatabaseExecutor(meterRegistry, 10, Duration.ofSeconds(1), 10));
         userService = new UserService(userRepository, meterRegistry, passwordEncoder,
                 new LimitedDatabaseExecutor(meterRegistry, 10, Duration.ofSeconds(1), 10), messageService,
-                new IdempotencyService(messageService), new TestTransactionManager());
+                new IdempotencyService(messageService, new TestRedisService()), new TestTransactionManager());
     }
 
     @Test
@@ -110,6 +111,17 @@ class UserServicePasswordMetricsTests {
 
         @Override
         public void rollback(TransactionStatus status) {
+        }
+    }
+
+    private static final class TestRedisService extends RedisService {
+        private TestRedisService() {
+            super(null);
+        }
+
+        @Override
+        public String getMessageStatus(String messageId) {
+            return MESSAGE_ID_UNCOMPLETED;
         }
     }
 

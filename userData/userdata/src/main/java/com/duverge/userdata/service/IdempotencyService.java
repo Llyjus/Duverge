@@ -3,14 +3,18 @@ package com.duverge.userdata.service;
 import org.springframework.stereotype.Service;
 
 import com.duverge.userdata.error.DuplicateMessageIdException;
+import com.duverge.userdata.error.MessageIdStateException;
+import com.duverge.userdata.internal.infra.redis.RedisService;
 
 /** Checks whether a request Message ID has already been recorded. */
 @Service
 public class IdempotencyService {
     private final MessageService messageService;
+    private final RedisService redisService;
 
-    public IdempotencyService(MessageService messageService) {
+    public IdempotencyService(MessageService messageService, RedisService redisService) {
         this.messageService = messageService;
+        this.redisService = redisService;
     }
 
     /**
@@ -18,6 +22,13 @@ public class IdempotencyService {
      * database constraint remains the final guard against concurrent requests.
      */
     public void ensureNewMessageId(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            throw new MessageIdStateException("Message ID is required");
+        }
+        String status = redisService.getMessageStatus(messageId);
+        if (!RedisService.MESSAGE_ID_UNCOMPLETED.equals(status)) {
+            throw new MessageIdStateException("Message ID is missing or is not uncompleted in Redis");
+        }
         if (messageService.findByMessageId(messageId).isPresent()) {
             throw new DuplicateMessageIdException("Message ID has already been recorded", null);
         }
