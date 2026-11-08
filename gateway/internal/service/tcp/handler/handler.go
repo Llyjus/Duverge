@@ -22,7 +22,12 @@ func HandleConnection(
 	redisClient *redis.Client,
 	timeouts connection.Timeouts,
 ) {
-	defer session.Close()
+	defer func() {
+		if session.AuthStatus {
+			manager.Remove(session.UserID, session)
+		}
+		_ = session.Close()
+	}()
 	unauthenticatedDeadline := time.Now().Add(timeouts.Unauthenticated)
 
 	for {
@@ -149,8 +154,6 @@ func HandleConnection(
 				log.Printf("[TCP] failed to send chat response: %v\n", writeErr)
 				return
 			}
-
-			defer manager.Remove(session.UserID, session)
 
 			continue
 		}
