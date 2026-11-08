@@ -16,12 +16,14 @@ type Timeouts struct {
 type Session struct {
 	Conn       net.Conn
 	UserID     string
+	SessionID  string
 	AuthStatus bool
 
 	// Add a mutex to prevent concurrent writes to the connection
 	// and ensure thread safety.
-	writeMutex sync.Mutex
-	closeOnce  sync.Once
+	writeMutex     sync.Mutex
+	closeOnce      sync.Once
+	disconnectOnce sync.Once
 	// Add a write timeout to the session
 	// to prevent indefinite blocking on writes.
 	writeTimeout time.Duration

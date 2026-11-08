@@ -44,13 +44,6 @@ func Authenticate(
 		return fmt.Errorf("%w: empty user ID", protocol.ErrAuthenticationFailed)
 	}
 
-	// Mark the connection as authenticated
-	session.UserID = userID
-	session.AuthStatus = true
-
-	// Register the authenticated session
-	manager.Add(session)
-
 	// Create user status in Redis
 	if err := auth.UserStatusCreation(
 		redisClient,
@@ -59,6 +52,12 @@ func Authenticate(
 	); err != nil {
 		return fmt.Errorf("%w: failed to create user status: %v", protocol.ErrInternal, err)
 	}
+
+	// Mark and register the session only after all authentication setup succeeds.
+	session.UserID = userID
+	session.SessionID = authMsg.LoginSession
+	session.AuthStatus = true
+	manager.Add(session)
 
 	return nil
 }

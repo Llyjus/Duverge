@@ -14,6 +14,7 @@ func TcpServer(
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
 	timeouts connection.Timeouts,
+	roomDisconnectNotifier connection.RoomDisconnectNotifier,
 ) {
 	tcpListener, err := net.Listen("tcp", ":26527")
 	if err != nil {
@@ -31,12 +32,14 @@ func TcpServer(
 		}
 
 		session := connection.NewSession(conn, timeouts.Write)
+		disconnectHandler := connection.NewDisconnectHandler(manager, roomDisconnectNotifier, timeouts.Operation)
 
 		go handler.HandleConnection(
 			session,
 			manager,
 			redisClient,
 			timeouts,
+			disconnectHandler,
 		)
 	}
 }

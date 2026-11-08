@@ -90,7 +90,10 @@ func main() {
 	manager := connection.NewConnectionManager()
 
 	// Start the TCP server
-	server.TcpServer(manager, redisClient, tcpTimeouts)
+	// Room currently has no generated RPC that accepts both user_id and
+	// session_id for disconnect notifications; the connection layer exposes an
+	// interface so the RPC adapter can be wired when that API is available.
+	server.TcpServer(manager, redisClient, tcpTimeouts, nil)
 
 	<-quit
 	fmt.Println("Shutting down server...")

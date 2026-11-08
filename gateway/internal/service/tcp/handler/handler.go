@@ -21,13 +21,9 @@ func HandleConnection(
 	manager *connection.ConnectionManager,
 	redisClient *redis.Client,
 	timeouts connection.Timeouts,
+	disconnectHandler *connection.DisconnectHandler,
 ) {
-	defer func() {
-		if session.AuthStatus {
-			manager.Remove(session.UserID, session)
-		}
-		_ = session.Close()
-	}()
+	defer disconnectHandler.Handle(session)
 	unauthenticatedDeadline := time.Now().Add(timeouts.Unauthenticated)
 
 	for {
