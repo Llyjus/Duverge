@@ -733,6 +733,102 @@ func (x *EndGameResponse) GetResult() bool {
 	return false
 }
 
+type CleanUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	MessageId     string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CleanUserRequest) Reset() {
+	*x = CleanUserRequest{}
+	mi := &file_proto_room_room_4_gateway_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CleanUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CleanUserRequest) ProtoMessage() {}
+
+func (x *CleanUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_room_room_4_gateway_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CleanUserRequest.ProtoReflect.Descriptor instead.
+func (*CleanUserRequest) Descriptor() ([]byte, []int) {
+	return file_proto_room_room_4_gateway_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CleanUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CleanUserRequest) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+type CleanUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        bool                   `protobuf:"varint,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CleanUserResponse) Reset() {
+	*x = CleanUserResponse{}
+	mi := &file_proto_room_room_4_gateway_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CleanUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CleanUserResponse) ProtoMessage() {}
+
+func (x *CleanUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_room_room_4_gateway_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CleanUserResponse.ProtoReflect.Descriptor instead.
+func (*CleanUserResponse) Descriptor() ([]byte, []int) {
+	return file_proto_room_room_4_gateway_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CleanUserResponse) GetResult() bool {
+	if x != nil {
+		return x.Result
+	}
+	return false
+}
+
 var File_proto_room_room_4_gateway_proto protoreflect.FileDescriptor
 
 const file_proto_room_room_4_gateway_proto_rawDesc = "" +
@@ -783,7 +879,13 @@ const file_proto_room_room_4_gateway_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x02 \x01(\tR\tmessageId\")\n" +
 	"\x0fEndGameResponse\x12\x16\n" +
-	"\x06result\x18\x01 \x01(\bR\x06result2\xce\x03\n" +
+	"\x06result\x18\x01 \x01(\bR\x06result\"J\n" +
+	"\x10CleanUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x02 \x01(\tR\tmessageId\"+\n" +
+	"\x11CleanUserResponse\x12\x16\n" +
+	"\x06result\x18\x01 \x01(\bR\x06result2\x8c\x04\n" +
 	"\vRoomService\x12B\n" +
 	"\vGetRoomInfo\x12\x18.room.GetRoomInfoRequest\x1a\x19.room.GetRoomInfoResponse\x12?\n" +
 	"\n" +
@@ -792,7 +894,8 @@ const file_proto_room_room_4_gateway_proto_rawDesc = "" +
 	"\tLeaveRoom\x12\x16.room.LeaveRoomRequest\x1a\x17.room.LeaveRoomResponse\x12K\n" +
 	"\x0eSetPreparation\x12\x1b.room.SetPreparationRequest\x1a\x1c.room.SetPreparationResponse\x12<\n" +
 	"\tStartGame\x12\x16.room.StartGameRequest\x1a\x17.room.StartGameResponse\x126\n" +
-	"\aEndGame\x12\x14.room.EndGameRequest\x1a\x15.room.EndGameResponseB\x18Z\x16gateway/proto/room/genb\x06proto3"
+	"\aEndGame\x12\x14.room.EndGameRequest\x1a\x15.room.EndGameResponse\x12<\n" +
+	"\tCleanUser\x12\x16.room.CleanUserRequest\x1a\x17.room.CleanUserResponseB\x18Z\x16gateway/proto/room/genb\x06proto3"
 
 var (
 	file_proto_room_room_4_gateway_proto_rawDescOnce sync.Once
@@ -806,7 +909,7 @@ func file_proto_room_room_4_gateway_proto_rawDescGZIP() []byte {
 	return file_proto_room_room_4_gateway_proto_rawDescData
 }
 
-var file_proto_room_room_4_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_proto_room_room_4_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_proto_room_room_4_gateway_proto_goTypes = []any{
 	(*GetRoomInfoRequest)(nil),     // 0: room.GetRoomInfoRequest
 	(*GetRoomInfoResponse)(nil),    // 1: room.GetRoomInfoResponse
@@ -822,6 +925,8 @@ var file_proto_room_room_4_gateway_proto_goTypes = []any{
 	(*StartGameResponse)(nil),      // 11: room.StartGameResponse
 	(*EndGameRequest)(nil),         // 12: room.EndGameRequest
 	(*EndGameResponse)(nil),        // 13: room.EndGameResponse
+	(*CleanUserRequest)(nil),       // 14: room.CleanUserRequest
+	(*CleanUserResponse)(nil),      // 15: room.CleanUserResponse
 }
 var file_proto_room_room_4_gateway_proto_depIdxs = []int32{
 	0,  // 0: room.RoomService.GetRoomInfo:input_type -> room.GetRoomInfoRequest
@@ -831,15 +936,17 @@ var file_proto_room_room_4_gateway_proto_depIdxs = []int32{
 	8,  // 4: room.RoomService.SetPreparation:input_type -> room.SetPreparationRequest
 	10, // 5: room.RoomService.StartGame:input_type -> room.StartGameRequest
 	12, // 6: room.RoomService.EndGame:input_type -> room.EndGameRequest
-	1,  // 7: room.RoomService.GetRoomInfo:output_type -> room.GetRoomInfoResponse
-	3,  // 8: room.RoomService.CreateRoom:output_type -> room.CreateRoomResponse
-	5,  // 9: room.RoomService.JoinRoom:output_type -> room.JoinRoomResponse
-	7,  // 10: room.RoomService.LeaveRoom:output_type -> room.LeaveRoomResponse
-	9,  // 11: room.RoomService.SetPreparation:output_type -> room.SetPreparationResponse
-	11, // 12: room.RoomService.StartGame:output_type -> room.StartGameResponse
-	13, // 13: room.RoomService.EndGame:output_type -> room.EndGameResponse
-	7,  // [7:14] is the sub-list for method output_type
-	0,  // [0:7] is the sub-list for method input_type
+	14, // 7: room.RoomService.CleanUser:input_type -> room.CleanUserRequest
+	1,  // 8: room.RoomService.GetRoomInfo:output_type -> room.GetRoomInfoResponse
+	3,  // 9: room.RoomService.CreateRoom:output_type -> room.CreateRoomResponse
+	5,  // 10: room.RoomService.JoinRoom:output_type -> room.JoinRoomResponse
+	7,  // 11: room.RoomService.LeaveRoom:output_type -> room.LeaveRoomResponse
+	9,  // 12: room.RoomService.SetPreparation:output_type -> room.SetPreparationResponse
+	11, // 13: room.RoomService.StartGame:output_type -> room.StartGameResponse
+	13, // 14: room.RoomService.EndGame:output_type -> room.EndGameResponse
+	15, // 15: room.RoomService.CleanUser:output_type -> room.CleanUserResponse
+	8,  // [8:16] is the sub-list for method output_type
+	0,  // [0:8] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -856,7 +963,7 @@ func file_proto_room_room_4_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_room_room_4_gateway_proto_rawDesc), len(file_proto_room_room_4_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
