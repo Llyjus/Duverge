@@ -36,7 +36,7 @@ func NewDisconnectHandler(
 func (h *DisconnectHandler) Handle(session *Session) {
 	session.disconnectOnce.Do(func() {
 		wasAuthenticated := session.AuthStatus
-		if session.AuthStatus && session.UserID != "" {
+		if session.UserID != "" {
 			h.manager.Remove(session.UserID, session)
 		}
 		_ = session.Close()
