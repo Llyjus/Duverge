@@ -2,12 +2,14 @@ package com.duverge.userdata.internal.infra.redis;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import java.time.Duration;
 
 @Service
 public class RedisService {
     public static final String MESSAGE_ID_KEY_PREFIX = "message_id:";
     public static final String MESSAGE_ID_UNCOMPLETED = "uncompleted";
     public static final String MESSAGE_ID_COMPLETED = "completed";
+    public static final Duration MESSAGE_ID_TTL = Duration.ofHours(1);
 
     private final StringRedisTemplate redisTemplate;
 
@@ -35,6 +37,7 @@ public class RedisService {
         }
         redisTemplate.opsForValue().set(
                 MESSAGE_ID_KEY_PREFIX + messageId,
-                MESSAGE_ID_COMPLETED);
+                MESSAGE_ID_COMPLETED,
+                MESSAGE_ID_TTL);
     }
 }

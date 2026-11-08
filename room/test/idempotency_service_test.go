@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	idempotency "room/internal/service"
 
@@ -16,15 +17,17 @@ type fakeMessageStateStore struct {
 	state  string
 	getErr error
 	setErr error
+	setTTL time.Duration
 }
 
 func (s *fakeMessageStateStore) Get(context.Context, string) (string, error) {
 	return s.state, s.getErr
 }
 
-func (s *fakeMessageStateStore) Set(_ context.Context, _ string, value string) error {
+func (s *fakeMessageStateStore) Set(_ context.Context, _ string, value string, expiration time.Duration) error {
 	if s.setErr == nil {
 		s.state = value
+		s.setTTL = expiration
 	}
 	return s.setErr
 }
@@ -41,8 +44,8 @@ func TestIdempotencyServiceRunMarksSuccessfulOperationCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if !called || store.state != "completed" {
-		t.Fatalf("operation called=%v, Redis status=%q; want called and completed", called, store.state)
+	if !called || store.state != "completed" || store.setTTL != time.Hour {
+		t.Fatalf("operation called=%v, Redis status=%q, TTL=%s; want called, completed and 1h TTL", called, store.state, store.setTTL)
 	}
 }
 

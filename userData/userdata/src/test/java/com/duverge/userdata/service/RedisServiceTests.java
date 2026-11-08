@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Proxy;
+import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -30,6 +31,7 @@ class RedisServiceTests {
         redisService.markMessageCompleted("request-123");
         assertEquals("message_id:request-123", redisTemplate.lastWrittenKey);
         assertEquals("completed", redisTemplate.status);
+        assertEquals(Duration.ofHours(1), redisTemplate.lastWriteTtl);
     }
 
     @Test
@@ -46,6 +48,7 @@ class RedisServiceTests {
         private String status;
         private String lastReadKey;
         private String lastWrittenKey;
+        private Duration lastWriteTtl;
 
         private StubStringRedisTemplate(String status) {
             this.status = status;
@@ -65,6 +68,9 @@ class RedisServiceTests {
                         if (method.getName().equals("set")) {
                             lastWrittenKey = (String) args[0];
                             status = (String) args[1];
+                            if (args.length == 3) {
+                                lastWriteTtl = (Duration) args[2];
+                            }
                             return null;
                         }
                         if (method.getName().equals("toString")) {

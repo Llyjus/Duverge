@@ -862,7 +862,7 @@ Room 使用 Redis `WATCH`/事务更新 `room:<roomId>` 和相关 `user_status:<u
 | `session_account:<accountId>` | String | 7 天 | Gateway | Gateway |
 | `user_status:<userId>` | JSON String | 创建时 30 秒；Room 更新后通常永久 | Gateway/Room | Gateway/Room |
 | `room:<roomId>` | JSON String | 永久 | Room | Gateway/Room |
-| `message_id:<uuid>` | String（`uncompleted` / `completed`） | 无过期时间 | Gateway 创建、UserData/Room 更新 | UserData/Room |
+| `message_id:<uuid>` | String（`uncompleted` / `completed`） | 1 小时；完成时重新计 1 小时 | Gateway 创建、UserData/Room 更新 | UserData/Room |
 
 ### UserData Message ID 状态与事务流程
 
@@ -871,7 +871,7 @@ Gateway 收到注册或登录请求后，为这次 gRPC 操作生成 UUID，并�
 ```text
 key:   message_id:<uuid>
 value: uncompleted
-TTL:   无
+TTL:   1 小时
 ```
 
 Gateway 把同一个 ID 放进 UserData 的 gRPC 请求。请求到达后，`UserService` 先调用 `IdempotencyService` 读取 Redis，再查询用户或执行 BCrypt：
@@ -887,7 +887,7 @@ Gateway 把同一个 ID 放进 UserData 的 gRPC 请求。请求到达后，`Use
 1. 先检查账号是否已存在。若已存在，UserData 在 MySQL 事务中只写入 `messages` 记录，提交后把 Redis 状态改为 `completed`，并返回 `result=false`。
 2. 若账号不存在，在打开数据库事务前执行 BCrypt。
 3. 在同一个 MySQL 事务中再次检查账号，并写入 `users` 和 `messages` 两条记录。
-4. MySQL 事务提交成功后，UserData 把 `message_id:<uuid>` 的 value 从 `uncompleted` 改为 `completed`，再返回结果。
+4. MySQL 事务提交成功后，UserData 把 `message_id:<uuid>` 的 value 从 `uncompleted` 改为 `completed`，并把 TTL 重置为 1 小时，再返回结果。
 
 并发注册同一账号时，由 `uk_users_account_id` 唯一约束兜底；只有确认是这个账号约束冲突，才按账号已存在处理。Message ID 的冲突不会被误判为账号重复。
 
@@ -904,17 +904,17 @@ MySQL 提交与 Redis 状态更新不是一个分布式事务。如果 MySQL 已
 
 当前 `messages` 表只保存唯一 Message ID 和创建时间，不保存业务响应或登录 session。因此 `completed` 的重复请求会返回 gRPC `ALREADY_EXISTS`，不会返回第一次的结果；这提供了重复执行保护，还不是完整的响应重放式幂等。Gateway 对 UserData 登录的 `UNAVAILABLE` 会用同一个 Message ID 重试；若第一次其实已经提交、只是响应丢失，重试会遇到 `ALREADY_EXISTS`。Gateway 当前没有为 `ALREADY_EXISTS` 或 `FAILED_PRECONDITION` 设置专门的 HTTP 映射，会走通用错误响应。
 
-Message ID Redis key 当前没有 TTL。MySQL 中删除一天前 Message 记录的方法未被定时调用，也不会删除 Redis key；因此 `completed` ID 会一直留在 Redis，除非单独清理。
+Gateway 创建 Message ID 时设置 1 小时 TTL；UserData 或 Room 标记为 `completed` 时会把 TTL 重新设置为 1 小时。未完成的 ID 从 Gateway 创建起一小时后过期，已完成的 ID 从完成时起一小时后过期。MySQL 的一天前 Message 清理方法不控制 Redis key 的过期时间。
 
 ### Room Message ID 状态流程
 
-Gateway 调用 Room 的变更 RPC 前，会生成 UUID，并通过共享 Redis 的 `SET NX` 预留 `message_id:<uuid>`，初始值为 `uncompleted`，再把同一个 ID 放入 Room gRPC 请求。直接调用 Room gRPC 的客户端也必须先按此方式预留 key；Redis 中没有该 key 时，Room 会拒绝请求。
+Gateway 调用 Room 的变更 RPC 前，会生成 UUID，并通过共享 Redis 的 `SET NX` 预留 `message_id:<uuid>`，初始值为 `uncompleted`、TTL 为 1 小时，再把同一个 ID 放入 Room gRPC 请求。直接调用 Room gRPC 的客户端也必须先按此方式预留 key；Redis 中没有该 key 时，Room 会拒绝请求。
 
 Room service 层的 `IdempotencyService` 在执行业务操作前检查状态：
 
 | Redis 状态 | Room 行为 | gRPC 结果 |
 |---|---|---|
-| `uncompleted` | 执行变更；操作成功后改为 `completed` | 正常 RPC 响应 |
+| `uncompleted` | 执行变更；成功后改为 `completed`，并重新设置 1 小时 TTL | 正常 RPC 响应 |
 | `completed` | 拒绝重复 ID | `ALREADY_EXISTS` |
 | key 不存在、ID 为空或其他状态 | 不执行变更 | `FAILED_PRECONDITION` |
 | Redis 不可用 | 不执行变更，或报告完成状态写入失败 | `UNAVAILABLE` |

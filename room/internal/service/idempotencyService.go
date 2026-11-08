@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
@@ -14,6 +15,7 @@ const (
 	messageIDKeyPrefix       = "message_id:"
 	messageStatusUncompleted = "uncompleted"
 	messageStatusCompleted   = "completed"
+	messageIDTTL             = time.Hour
 )
 
 var (
@@ -30,7 +32,7 @@ type IdempotencyService struct {
 // MessageStateStore is the Redis-backed state contract used by the service.
 type MessageStateStore interface {
 	Get(ctx context.Context, key string) (string, error)
-	Set(ctx context.Context, key string, value string) error
+	Set(ctx context.Context, key string, value string, expiration time.Duration) error
 }
 
 type redisMessageStateStore struct{ client *redis.Client }
@@ -39,8 +41,8 @@ func (s redisMessageStateStore) Get(ctx context.Context, key string) (string, er
 	return s.client.Get(ctx, key).Result()
 }
 
-func (s redisMessageStateStore) Set(ctx context.Context, key string, value string) error {
-	return s.client.Set(ctx, key, value, 0).Err()
+func (s redisMessageStateStore) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
+	return s.client.Set(ctx, key, value, expiration).Err()
 }
 
 func NewIdempotencyService(client *redis.Client) *IdempotencyService {
@@ -73,7 +75,7 @@ func (s *IdempotencyService) Run(ctx context.Context, messageID string, operatio
 	if err := operation(); err != nil {
 		return err
 	}
-	if err := s.store.Set(ctx, messageIDKeyPrefix+messageID, messageStatusCompleted); err != nil {
+	if err := s.store.Set(ctx, messageIDKeyPrefix+messageID, messageStatusCompleted, messageIDTTL); err != nil {
 		return status.Errorf(codes.Unavailable, "mark message ID completed in Redis: %v", err)
 	}
 	return nil

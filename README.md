@@ -359,7 +359,7 @@ Room mutation RPCs (`CreateRoom`, `JoinRoom`, `LeaveRoom`, `SetPreparation`, `St
 | `session_account:<accountId>` | `session:<sessionId>` | 7 days |
 | `user_status:<userId>` | User ID and status JSON | Initially 30 seconds; heartbeat renews it |
 | `room:<roomId>` | Room JSON | No expiration; deleted when the room becomes empty |
-| `message_id:<uuid>` | `uncompleted` or `completed` | No expiration |
+| `message_id:<uuid>` | `uncompleted` or `completed` | 1 hour; reset to 1 hour when marked completed |
 
 User statuses include `in_lobby`, `in_room` and `in_game`. Room statuses include `waiting`, `in_game` and `finished`.
 
@@ -370,7 +370,7 @@ Gateway creates a UUID for each registration or login request and reserves it wi
 ```text
 key:   message_id:<uuid>
 value: uncompleted
-TTL:   none
+TTL:   1 hour
 ```
 
 Gateway sends that same ID in the UserData gRPC request. Before looking up the user or running BCrypt, `UserService` asks `IdempotencyService` to read the Redis key:
@@ -385,23 +385,23 @@ For a new registration, UserData hashes the password before opening the database
 
 For login, UserData looks up the account and verifies the password, then records the Message ID in a short MySQL transaction. A valid password, invalid password, or missing account are completed login checks and are recorded; a successful login response then receives a session ID, which Gateway stores separately in Redis.
 
-After the MySQL transaction commits, UserData changes the Redis value to `completed`. It does not mark the ID complete when validation, BCrypt, or the database transaction fails. If the transaction rolls back, its `messages` row is rolled back too and the Redis value remains `uncompleted`.
+After the MySQL transaction commits, UserData changes the Redis value to `completed` and resets its TTL to 1 hour. It does not mark the ID complete when validation, BCrypt, or the database transaction fails. If the transaction rolls back, its `messages` row is rolled back too and the Redis value remains `uncompleted` with its original remaining TTL.
 
 The `messages.message_id` column has the unique constraint `uk_messages_id`. Redis provides the request-state check; MySQL remains the final guard if concurrent requests both observe `uncompleted`. A duplicate database Message ID is reported by UserData as `ALREADY_EXISTS`, and a registration transaction that cannot insert its Message row also rolls back the new user.
 
 The MySQL commit and Redis status update are separate operations, not one distributed transaction. If MySQL commits and the subsequent Redis update fails, the database operation is already recorded while Redis may still say `uncompleted`. Also, `completed` requests are rejected rather than receiving the original response: the current Message table stores only the ID and creation time, not a response or login session. Therefore this is duplicate execution protection, not response replay. Gateway retries UserData login on `UNAVAILABLE` using the same request ID; if the first attempt committed but its response was lost, the retry can receive `ALREADY_EXISTS` instead of the original login response. The current HTTP handler maps this and `FAILED_PRECONDITION` to its generic error response.
 
-Message ID keys have no TTL. The one-day MySQL Message cleanup method is not scheduled and does not delete these Redis keys, so completed IDs remain in Redis until removed separately.
+Gateway initially reserves each Message ID for 1 hour. UserData and Room reset the key's TTL to 1 hour when they mark it `completed`. Uncompleted IDs expire one hour after Gateway creates them; completed IDs expire one hour after completion. The one-day MySQL Message cleanup method is not scheduled and does not control Redis key expiry.
 
 ### Room Message ID workflow
 
-Before sending a Room mutation RPC, Gateway generates a UUID and reserves `message_id:<uuid>` in the shared Redis with `SET NX` and value `uncompleted`. It sends the same ID in the Room gRPC request. Direct Room gRPC callers must reserve the key this way before calling a mutation; a missing key is rejected.
+Before sending a Room mutation RPC, Gateway generates a UUID and reserves `message_id:<uuid>` in the shared Redis with `SET NX`, value `uncompleted` and a 1-hour TTL. It sends the same ID in the Room gRPC request. Direct Room gRPC callers must reserve the key this way before calling a mutation; a missing key is rejected.
 
 The Room service's `IdempotencyService` checks Redis before running the operation:
 
 | Redis state | Room behavior | gRPC result |
 |---|---|---|
-| `uncompleted` | Run the mutation; set the value to `completed` after it succeeds | Normal RPC response |
+| `uncompleted` | Run the mutation; set the value to `completed` with a fresh 1-hour TTL after it succeeds | Normal RPC response |
 | `completed` | Reject the repeated ID | `ALREADY_EXISTS` |
 | Key missing, blank ID, or any other value | Do not run the mutation | `FAILED_PRECONDITION` |
 | Redis unavailable | Do not run the mutation, or report completion-write failure | `UNAVAILABLE` |
