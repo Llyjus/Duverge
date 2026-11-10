@@ -29,6 +29,29 @@ func TestHandleDisconnectOutsideRoomIsIdempotent(t *testing.T) {
 			t.Fatalf("repeated lobby disconnect returned error: %v", err)
 		}
 	}
+	storedStatus, err := client.Get(context.Background(), key).Result()
+	if err != nil {
+		t.Fatalf("lobby status lookup error = %v", err)
+	}
+	if storedStatus != string(statusJSON) {
+		t.Fatalf("disconnect outside a room changed lobby status: %s", storedStatus)
+	}
+}
+
+func TestHandleDisconnectReturnsRedisError(t *testing.T) {
+	client := redis.NewClient(&redis.Options{
+		Addr:        "127.0.0.1:1",
+		DialTimeout: 100 * time.Millisecond,
+		MaxRetries:  -1,
+	})
+	t.Cleanup(func() { _ = client.Close() })
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err := service.HandleDisconnect(ctx, client, "redis-error-user", "session")
+	if err == nil {
+		t.Fatal("HandleDisconnect() returned nil while Redis was unavailable")
+	}
 }
 
 func TestHandleDisconnectIgnoresStaleSession(t *testing.T) {
