@@ -12,7 +12,7 @@ service RoomService {
   rpc SetPreparation(SetPreparationRequest) returns (SetPreparationResponse);
   rpc StartGame(StartGameRequest) returns (StartGameResponse);
   rpc EndGame(EndGameRequest) returns (EndGameResponse);
-  rpc CleanUser(CleanUserRequest) returns (CleanUserResponse);
+  rpc UserDisconnected(UserDisconnectedRequest) returns (UserDisconnectedResponse);
 }
 
 message GetRoomInfoRequest {
@@ -83,11 +83,11 @@ message EndGameResponse {
   bool result = 1;
 }
 
-message CleanUserRequest {
+message UserDisconnectedRequest {
   string user_id = 1;
   string message_id = 2;
 }
 
-message CleanUserResponse {
+message UserDisconnectedResponse {
   bool result = 1;
 }

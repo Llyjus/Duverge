@@ -19,14 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RoomService_GetRoomInfo_FullMethodName    = "/room.RoomService/GetRoomInfo"
-	RoomService_CreateRoom_FullMethodName     = "/room.RoomService/CreateRoom"
-	RoomService_JoinRoom_FullMethodName       = "/room.RoomService/JoinRoom"
-	RoomService_LeaveRoom_FullMethodName      = "/room.RoomService/LeaveRoom"
-	RoomService_SetPreparation_FullMethodName = "/room.RoomService/SetPreparation"
-	RoomService_StartGame_FullMethodName      = "/room.RoomService/StartGame"
-	RoomService_EndGame_FullMethodName        = "/room.RoomService/EndGame"
-	RoomService_CleanUser_FullMethodName      = "/room.RoomService/CleanUser"
+	RoomService_GetRoomInfo_FullMethodName      = "/room.RoomService/GetRoomInfo"
+	RoomService_CreateRoom_FullMethodName       = "/room.RoomService/CreateRoom"
+	RoomService_JoinRoom_FullMethodName         = "/room.RoomService/JoinRoom"
+	RoomService_LeaveRoom_FullMethodName        = "/room.RoomService/LeaveRoom"
+	RoomService_SetPreparation_FullMethodName   = "/room.RoomService/SetPreparation"
+	RoomService_StartGame_FullMethodName        = "/room.RoomService/StartGame"
+	RoomService_EndGame_FullMethodName          = "/room.RoomService/EndGame"
+	RoomService_UserDisconnected_FullMethodName = "/room.RoomService/UserDisconnected"
 )
 
 // RoomServiceClient is the client API for RoomService service.
@@ -40,7 +40,7 @@ type RoomServiceClient interface {
 	SetPreparation(ctx context.Context, in *SetPreparationRequest, opts ...grpc.CallOption) (*SetPreparationResponse, error)
 	StartGame(ctx context.Context, in *StartGameRequest, opts ...grpc.CallOption) (*StartGameResponse, error)
 	EndGame(ctx context.Context, in *EndGameRequest, opts ...grpc.CallOption) (*EndGameResponse, error)
-	CleanUser(ctx context.Context, in *CleanUserRequest, opts ...grpc.CallOption) (*CleanUserResponse, error)
+	UserDisconnected(ctx context.Context, in *UserDisconnectedRequest, opts ...grpc.CallOption) (*UserDisconnectedResponse, error)
 }
 
 type roomServiceClient struct {
@@ -121,10 +121,10 @@ func (c *roomServiceClient) EndGame(ctx context.Context, in *EndGameRequest, opt
 	return out, nil
 }
 
-func (c *roomServiceClient) CleanUser(ctx context.Context, in *CleanUserRequest, opts ...grpc.CallOption) (*CleanUserResponse, error) {
+func (c *roomServiceClient) UserDisconnected(ctx context.Context, in *UserDisconnectedRequest, opts ...grpc.CallOption) (*UserDisconnectedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CleanUserResponse)
-	err := c.cc.Invoke(ctx, RoomService_CleanUser_FullMethodName, in, out, cOpts...)
+	out := new(UserDisconnectedResponse)
+	err := c.cc.Invoke(ctx, RoomService_UserDisconnected_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ type RoomServiceServer interface {
 	SetPreparation(context.Context, *SetPreparationRequest) (*SetPreparationResponse, error)
 	StartGame(context.Context, *StartGameRequest) (*StartGameResponse, error)
 	EndGame(context.Context, *EndGameRequest) (*EndGameResponse, error)
-	CleanUser(context.Context, *CleanUserRequest) (*CleanUserResponse, error)
+	UserDisconnected(context.Context, *UserDisconnectedRequest) (*UserDisconnectedResponse, error)
 	mustEmbedUnimplementedRoomServiceServer()
 }
 
@@ -174,8 +174,8 @@ func (UnimplementedRoomServiceServer) StartGame(context.Context, *StartGameReque
 func (UnimplementedRoomServiceServer) EndGame(context.Context, *EndGameRequest) (*EndGameResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EndGame not implemented")
 }
-func (UnimplementedRoomServiceServer) CleanUser(context.Context, *CleanUserRequest) (*CleanUserResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CleanUser not implemented")
+func (UnimplementedRoomServiceServer) UserDisconnected(context.Context, *UserDisconnectedRequest) (*UserDisconnectedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UserDisconnected not implemented")
 }
 func (UnimplementedRoomServiceServer) mustEmbedUnimplementedRoomServiceServer() {}
 func (UnimplementedRoomServiceServer) testEmbeddedByValue()                     {}
@@ -324,20 +324,20 @@ func _RoomService_EndGame_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RoomService_CleanUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CleanUserRequest)
+func _RoomService_UserDisconnected_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserDisconnectedRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RoomServiceServer).CleanUser(ctx, in)
+		return srv.(RoomServiceServer).UserDisconnected(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RoomService_CleanUser_FullMethodName,
+		FullMethod: RoomService_UserDisconnected_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RoomServiceServer).CleanUser(ctx, req.(*CleanUserRequest))
+		return srv.(RoomServiceServer).UserDisconnected(ctx, req.(*UserDisconnectedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -378,8 +378,8 @@ var RoomService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RoomService_EndGame_Handler,
 		},
 		{
-			MethodName: "CleanUser",
-			Handler:    _RoomService_CleanUser_Handler,
+			MethodName: "UserDisconnected",
+			Handler:    _RoomService_UserDisconnected_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
