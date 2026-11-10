@@ -18,15 +18,71 @@ func TestHandleDisconnectOutsideRoomIsIdempotent(t *testing.T) {
 	userID := "disconnect-lobby-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	key := "user_status:" + userID
 	t.Cleanup(func() { _ = client.Del(context.Background(), key).Err() })
+	sessionID := setActiveSession(t, client, userID)
 	statusJSON, _ := json.Marshal(entity.UserStatus{UserID: userID, Status: entity.UserStatusInLobby})
 	if err := client.Set(context.Background(), key, statusJSON, 0).Err(); err != nil {
 		t.Fatal(err)
 	}
 
 	for range 2 {
-		if err := service.HandleDisconnect(context.Background(), client, userID); err != nil {
+		if err := service.HandleDisconnect(context.Background(), client, userID, sessionID); err != nil {
 			t.Fatalf("repeated lobby disconnect returned error: %v", err)
 		}
+	}
+}
+
+func TestHandleDisconnectIgnoresStaleSession(t *testing.T) {
+	client := resilienceRedis(t)
+	userID := "disconnect-stale-session-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	statusKey := "user_status:" + userID
+	sessionKey := "session_account:" + userID
+	roomID := "disconnect-stale-room-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	roomKey := "room:" + roomID
+	t.Cleanup(func() { _ = client.Del(context.Background(), statusKey, sessionKey, roomKey).Err() })
+
+	oldSessionID := "old-session"
+	newSessionID := "new-session"
+	if err := client.Set(context.Background(), sessionKey, "session:"+newSessionID, 7*24*time.Hour).Err(); err != nil {
+		t.Fatal(err)
+	}
+	roomJSON, _ := json.Marshal(entity.Room{
+		RoomID: roomID, MaximumSize: 4, UserIDs: []string{userID},
+		HosterID: userID, Prepared: []string{}, Status: entity.RoomStatusInGame,
+	})
+	statusJSON, _ := json.Marshal(entity.UserStatus{
+		UserID: userID, Status: entity.UserStatusInGame, RoomID: roomID,
+	})
+	if err := client.Set(context.Background(), roomKey, roomJSON, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Set(context.Background(), statusKey, statusJSON, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.HandleDisconnect(context.Background(), client, userID, oldSessionID); err != nil {
+		t.Fatalf("stale session disconnect returned error: %v", err)
+	}
+	storedStatus, err := client.Get(context.Background(), statusKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotStatus entity.UserStatus
+	if err := json.Unmarshal([]byte(storedStatus), &gotStatus); err != nil {
+		t.Fatal(err)
+	}
+	if gotStatus.ConnectionStatus == entity.UserConnectionStatusDisconnected {
+		t.Fatalf("new session status was marked disconnected: %+v", gotStatus)
+	}
+	storedRoom, err := client.Get(context.Background(), roomKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotRoom entity.Room
+	if err := json.Unmarshal([]byte(storedRoom), &gotRoom); err != nil {
+		t.Fatal(err)
+	}
+	if len(gotRoom.UserIDs) != 1 || gotRoom.UserIDs[0] != userID || len(gotRoom.DisconnectedUserIDs) != 0 {
+		t.Fatalf("stale session changed room membership/state: %+v", gotRoom)
 	}
 }
 
@@ -40,6 +96,7 @@ func TestHandleDisconnectRemovesWaitingRoomMemberAndStatus(t *testing.T) {
 	hostStatusKey := "user_status:" + hostID
 	guestStatusKey := "user_status:" + guestID
 	t.Cleanup(func() { _ = client.Del(context.Background(), roomKey, hostStatusKey, guestStatusKey).Err() })
+	sessionID := setActiveSession(t, client, guestID)
 
 	roomJSON, _ := json.Marshal(entity.Room{
 		RoomID: roomID, MaximumSize: 4, UserIDs: []string{hostID, guestID},
@@ -55,7 +112,7 @@ func TestHandleDisconnectRemovesWaitingRoomMemberAndStatus(t *testing.T) {
 		}
 	}
 
-	if err := service.HandleDisconnect(context.Background(), client, guestID); err != nil {
+	if err := service.HandleDisconnect(context.Background(), client, guestID, sessionID); err != nil {
 		t.Fatalf("HandleDisconnect() error = %v", err)
 	}
 	if _, err := client.Get(context.Background(), guestStatusKey).Result(); err != redis.Nil {
@@ -82,6 +139,7 @@ func TestHandleDisconnectDeletesEmptyWaitingRoom(t *testing.T) {
 	roomKey := "room:" + roomID
 	statusKey := "user_status:" + userID
 	t.Cleanup(func() { _ = client.Del(context.Background(), roomKey, statusKey).Err() })
+	sessionID := setActiveSession(t, client, userID)
 	roomJSON, _ := json.Marshal(entity.Room{
 		RoomID: roomID, MaximumSize: 4, UserIDs: []string{userID},
 		HosterID: userID, Prepared: []string{}, Status: entity.RoomStatusWaiting,
@@ -94,7 +152,7 @@ func TestHandleDisconnectDeletesEmptyWaitingRoom(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := service.HandleDisconnect(context.Background(), client, userID); err != nil {
+	if err := service.HandleDisconnect(context.Background(), client, userID, sessionID); err != nil {
 		t.Fatalf("HandleDisconnect() error = %v", err)
 	}
 	if _, err := client.Get(context.Background(), roomKey).Result(); err != redis.Nil {
@@ -115,6 +173,7 @@ func TestHandleDisconnectPreservesInGameMemberAndDisconnectedState(t *testing.T)
 	statusKey := "user_status:" + userID
 	otherStatusKey := "user_status:" + otherID
 	t.Cleanup(func() { _ = client.Del(context.Background(), roomKey, statusKey, otherStatusKey).Err() })
+	sessionID := setActiveSession(t, client, userID)
 	roomJSON, _ := json.Marshal(entity.Room{
 		RoomID: roomID, MaximumSize: 4, UserIDs: []string{userID, otherID},
 		HosterID: userID, Prepared: []string{userID, otherID}, Status: entity.RoomStatusInGame,
@@ -132,7 +191,7 @@ func TestHandleDisconnectPreservesInGameMemberAndDisconnectedState(t *testing.T)
 		t.Fatal(err)
 	}
 
-	if err := service.HandleDisconnect(context.Background(), client, userID); err != nil {
+	if err := service.HandleDisconnect(context.Background(), client, userID, sessionID); err != nil {
 		t.Fatalf("HandleDisconnect() error = %v", err)
 	}
 	storedStatus, err := client.Get(context.Background(), statusKey).Result()
@@ -188,6 +247,17 @@ func TestHandleDisconnectPreservesInGameMemberAndDisconnectedState(t *testing.T)
 	if updatedRoom.Status != entity.RoomStatusWaiting || len(updatedRoom.UserIDs) != 1 || updatedRoom.UserIDs[0] != otherID || len(updatedRoom.DisconnectedUserIDs) != 0 {
 		t.Fatalf("room after game end = %+v, want only connected member and no disconnect markers", updatedRoom)
 	}
+}
+
+func setActiveSession(t *testing.T, client *redis.Client, userID string) string {
+	t.Helper()
+	sessionID := "disconnect-session-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	key := "session_account:" + userID
+	if err := client.Set(context.Background(), key, "session:"+sessionID, 7*24*time.Hour).Err(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Del(context.Background(), key).Err() })
+	return sessionID
 }
 
 func TestEndRoomGameDeletesRoomWhenAllMembersAreDisconnected(t *testing.T) {

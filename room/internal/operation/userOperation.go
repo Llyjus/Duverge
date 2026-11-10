@@ -49,8 +49,30 @@ func GetUserStatus(ctx context.Context, client *redis.Client, userId string) (*e
 	return &userStatus, nil
 }
 
-func DeleteUserStatus(ctx context.Context, client *redis.Client, userId string) error {
-	return client.Del(ctx, "user_status:"+userId).Err()
+func IsCurrentSession(ctx context.Context, client *redis.Client, userID, sessionID string) (bool, error) {
+	currentSession, err := client.Get(ctx, "session_account:"+userID).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return currentSession == "session:"+sessionID, nil
+}
+
+func DeleteUserStatusIfCurrentSession(ctx context.Context, client *redis.Client, userID, sessionID string) error {
+	userStatusKey := "user_status:" + userID
+	sessionKey := "session_account:" + userID
+	return client.Watch(ctx, func(tx *redis.Tx) error {
+		if err := ensureCurrentSession(ctx, tx, userID, sessionID); err != nil {
+			return err
+		}
+		_, err := tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+			pipe.Del(ctx, userStatusKey)
+			return nil
+		})
+		return err
+	}, userStatusKey, sessionKey)
 }
 
 func UpdateUserStatus(

@@ -737,6 +737,7 @@ type UserDisconnectedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	MessageId     string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -781,6 +782,13 @@ func (x *UserDisconnectedRequest) GetUserId() string {
 func (x *UserDisconnectedRequest) GetMessageId() string {
 	if x != nil {
 		return x.MessageId
+	}
+	return ""
+}
+
+func (x *UserDisconnectedRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
 	}
 	return ""
 }
@@ -879,11 +887,13 @@ const file_proto_room_room_4_room_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x02 \x01(\tR\tmessageId\")\n" +
 	"\x0fEndGameResponse\x12\x16\n" +
-	"\x06result\x18\x01 \x01(\bR\x06result\"Q\n" +
+	"\x06result\x18\x01 \x01(\bR\x06result\"p\n" +
 	"\x17UserDisconnectedRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x02 \x01(\tR\tmessageId\"2\n" +
+	"message_id\x18\x02 \x01(\tR\tmessageId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"2\n" +
 	"\x18UserDisconnectedResponse\x12\x16\n" +
 	"\x06result\x18\x01 \x01(\bR\x06result2\xa1\x04\n" +
 	"\vRoomService\x12B\n" +

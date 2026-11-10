@@ -108,7 +108,7 @@ func (s *RoomServer) UserDisconnected(
 	req *pb.UserDisconnectedRequest,
 ) (*pb.UserDisconnectedResponse, error) {
 	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
-		return service.HandleDisconnect(ctx, s.client, req.GetUserId())
+		return service.HandleDisconnect(ctx, s.client, req.GetUserId(), req.GetSessionId())
 	})
 	if err != nil {
 		return nil, err

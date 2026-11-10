@@ -14,7 +14,22 @@ import (
 var (
 	ErrUserIsInGame  = errors.New("user is in a game")
 	ErrUserNotInGame = errors.New("user is no longer in a game")
+	ErrStaleSession  = errors.New("disconnect notification is for a stale session")
 )
+
+func ensureCurrentSession(ctx context.Context, tx *redis.Tx, userID, sessionID string) error {
+	currentSession, err := tx.Get(ctx, "session_account:"+userID).Result()
+	if err == redis.Nil {
+		return ErrStaleSession
+	}
+	if err != nil {
+		return err
+	}
+	if currentSession != "session:"+sessionID {
+		return ErrStaleSession
+	}
+	return nil
+}
 
 func FindRoomIDByUser(ctx context.Context, client *redis.Client, userID string) (string, error) {
 	var cursor uint64
@@ -54,11 +69,15 @@ func FindRoomIDByUser(ctx context.Context, client *redis.Client, userID string) 
 // RemoveDisconnectedUser removes a disconnected non-game player and their
 // user_status key in the same watched Redis transaction. ErrUserIsInGame tells
 // the service that the room transitioned to a game and must retain the user.
-func RemoveDisconnectedUser(ctx context.Context, client *redis.Client, roomID, userID string) error {
+func RemoveDisconnectedUser(ctx context.Context, client *redis.Client, roomID, userID, sessionID string) error {
 	userStatusKey := "user_status:" + userID
 	roomKey := "room:" + roomID
+	sessionKey := "session_account:" + userID
 
 	return client.Watch(ctx, func(tx *redis.Tx) error {
+		if err := ensureCurrentSession(ctx, tx, userID, sessionID); err != nil {
+			return err
+		}
 		roomJSON, err := tx.Get(ctx, roomKey).Result()
 		if err == redis.Nil {
 			_, err := tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
@@ -96,16 +115,20 @@ func RemoveDisconnectedUser(ctx context.Context, client *redis.Client, roomID, u
 			return nil
 		})
 		return err
-	}, userStatusKey, roomKey)
+	}, userStatusKey, roomKey, sessionKey)
 }
 
 // MarkUserDisconnected keeps an in-game player's status persistent and marks
 // the connection as disconnected without changing room membership.
-func MarkUserDisconnected(ctx context.Context, client *redis.Client, roomID, userID string) error {
+func MarkUserDisconnected(ctx context.Context, client *redis.Client, roomID, userID, sessionID string) error {
 	userStatusKey := "user_status:" + userID
 	roomKey := "room:" + roomID
+	sessionKey := "session_account:" + userID
 
 	return client.Watch(ctx, func(tx *redis.Tx) error {
+		if err := ensureCurrentSession(ctx, tx, userID, sessionID); err != nil {
+			return err
+		}
 		var userStatus entity.UserStatus
 		statusJSON, err := tx.Get(ctx, userStatusKey).Result()
 		statusExists := err == nil
@@ -161,7 +184,7 @@ func MarkUserDisconnected(ctx context.Context, client *redis.Client, roomID, use
 			return nil
 		})
 		return err
-	}, userStatusKey, roomKey)
+	}, userStatusKey, roomKey, sessionKey)
 }
 
 func containsID(ids []string, id string) bool {

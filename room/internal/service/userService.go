@@ -12,9 +12,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func HandleDisconnect(ctx context.Context, client *redis.Client, userID string) error {
-	if userID == "" {
-		return status.Error(codes.InvalidArgument, "user_id is required")
+func HandleDisconnect(ctx context.Context, client *redis.Client, userID, sessionID string) error {
+	if userID == "" || sessionID == "" {
+		return status.Error(codes.InvalidArgument, "user_id and session_id are required")
+	}
+	currentSession, err := operation.IsCurrentSession(ctx, client, userID, sessionID)
+	if err != nil {
+		return err
+	}
+	if !currentSession {
+		return nil
 	}
 
 	for attempt := 0; attempt < 3; attempt++ {
@@ -35,16 +42,25 @@ func HandleDisconnect(ctx context.Context, client *redis.Client, userID string) 
 		}
 
 		if userStatus.Status == entity.UserStatusInGame {
-			err = operation.MarkUserDisconnected(ctx, client, roomID, userID)
+			err = operation.MarkUserDisconnected(ctx, client, roomID, userID, sessionID)
+			if errors.Is(err, operation.ErrStaleSession) {
+				return nil
+			}
 			if errors.Is(err, operation.ErrUserNotInGame) {
 				if roomID == "" {
-					err = operation.DeleteUserStatus(ctx, client, userID)
+					err = operation.DeleteUserStatusIfCurrentSession(ctx, client, userID, sessionID)
 				} else {
-					err = operation.RemoveDisconnectedUser(ctx, client, roomID, userID)
+					err = operation.RemoveDisconnectedUser(ctx, client, roomID, userID, sessionID)
+					if errors.Is(err, operation.ErrStaleSession) {
+						return nil
+					}
 					if errors.Is(err, operation.ErrUserIsInGame) {
-						err = operation.MarkUserDisconnected(ctx, client, roomID, userID)
+						err = operation.MarkUserDisconnected(ctx, client, roomID, userID, sessionID)
 					}
 				}
+			}
+			if errors.Is(err, operation.ErrStaleSession) {
+				return nil
 			}
 			if errors.Is(err, operation.ErrUserNotInGame) || err == redis.TxFailedErr {
 				continue
@@ -56,12 +72,22 @@ func HandleDisconnect(ctx context.Context, client *redis.Client, userID string) 
 			return nil
 		}
 		if roomID == "" {
-			return operation.DeleteUserStatus(ctx, client, userID)
+			err = operation.DeleteUserStatusIfCurrentSession(ctx, client, userID, sessionID)
+			if errors.Is(err, operation.ErrStaleSession) {
+				return nil
+			}
+			return err
 		}
 
-		err = operation.RemoveDisconnectedUser(ctx, client, roomID, userID)
+		err = operation.RemoveDisconnectedUser(ctx, client, roomID, userID, sessionID)
+		if errors.Is(err, operation.ErrStaleSession) {
+			return nil
+		}
 		if errors.Is(err, operation.ErrUserIsInGame) {
-			err = operation.MarkUserDisconnected(ctx, client, roomID, userID)
+			err = operation.MarkUserDisconnected(ctx, client, roomID, userID, sessionID)
+			if errors.Is(err, operation.ErrStaleSession) {
+				return nil
+			}
 			if errors.Is(err, operation.ErrUserNotInGame) {
 				continue
 			}

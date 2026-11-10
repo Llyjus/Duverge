@@ -86,6 +86,7 @@ message EndGameResponse {
 message UserDisconnectedRequest {
   string user_id = 1;
   string message_id = 2;
+  string session_id = 3;
 }
 
 message UserDisconnectedResponse {
