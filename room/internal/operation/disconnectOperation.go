@@ -93,6 +93,13 @@ func RemoveDisconnectedUser(ctx context.Context, client *redis.Client, roomID, u
 		if err := json.Unmarshal([]byte(roomJSON), &room); err != nil {
 			return err
 		}
+		_, statusErr := tx.Get(ctx, userStatusKey).Result()
+		if statusErr != nil && statusErr != redis.Nil {
+			return statusErr
+		}
+		if !containsID(room.UserIDs, userID) && !containsID(room.DisconnectedUserIDs, userID) && statusErr == redis.Nil {
+			return nil
+		}
 		if room.Status == entity.RoomStatusInGame {
 			return ErrUserIsInGame
 		}
@@ -162,6 +169,10 @@ func MarkUserDisconnected(ctx context.Context, client *redis.Client, roomID, use
 			}
 		} else if !statusExists || userStatus.Status != entity.UserStatusInGame {
 			return ErrUserNotInGame
+		}
+		if userStatus.ConnectionStatus == entity.UserConnectionStatusDisconnected &&
+			(!roomIsInGame || containsID(room.DisconnectedUserIDs, userID)) {
+			return nil
 		}
 		userStatus.UserID = userID
 		userStatus.Status = entity.UserStatusInGame

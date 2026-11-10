@@ -3,7 +3,6 @@ package operation
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"room/internal/entity"
 
@@ -81,7 +80,7 @@ func EndGame(
 	}
 
 	if roomSnapshot == nil {
-		return errors.New("room not found")
+		return nil
 	}
 
 	roomKey := "room:" + roomID
@@ -92,6 +91,9 @@ func EndGame(
 
 	return client.Watch(ctx, func(tx *redis.Tx) error {
 		roomJSON, err := tx.Get(ctx, roomKey).Result()
+		if err == redis.Nil {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -101,6 +103,9 @@ func EndGame(
 		}
 		if !sameIDs(roomSnapshot.UserIDs, room.UserIDs) || !sameIDs(roomSnapshot.DisconnectedUserIDs, room.DisconnectedUserIDs) {
 			return redis.TxFailedErr
+		}
+		if room.Status != entity.RoomStatusInGame && room.Status != entity.RoomStatusFinished {
+			return nil
 		}
 
 		remainingUsers := make([]string, 0, len(room.UserIDs))

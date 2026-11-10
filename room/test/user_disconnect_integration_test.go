@@ -115,6 +115,9 @@ func TestHandleDisconnectRemovesWaitingRoomMemberAndStatus(t *testing.T) {
 	if err := service.HandleDisconnect(context.Background(), client, guestID, sessionID); err != nil {
 		t.Fatalf("HandleDisconnect() error = %v", err)
 	}
+	if err := service.HandleDisconnect(context.Background(), client, guestID, sessionID); err != nil {
+		t.Fatalf("repeated HandleDisconnect() error = %v", err)
+	}
 	if _, err := client.Get(context.Background(), guestStatusKey).Result(); err != redis.Nil {
 		t.Fatalf("disconnected user's status error = %v, want redis.Nil", err)
 	}
@@ -220,9 +223,47 @@ func TestHandleDisconnectPreservesInGameMemberAndDisconnectedState(t *testing.T)
 	if len(updatedRoom.UserIDs) != 2 || !contains(updatedRoom.UserIDs, userID) || !contains(updatedRoom.DisconnectedUserIDs, userID) {
 		t.Fatalf("room after disconnect = %+v, want member retained and marked disconnected", updatedRoom)
 	}
+	firstDisconnectStatus := storedStatus
+	firstDisconnectRoom := storedRoom
+	if err := service.HandleDisconnect(context.Background(), client, userID, sessionID); err != nil {
+		t.Fatalf("repeated in-game HandleDisconnect() error = %v", err)
+	}
+	storedStatus, err = client.Get(context.Background(), statusKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedRoom, err = client.Get(context.Background(), roomKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storedStatus != firstDisconnectStatus || storedRoom != firstDisconnectRoom {
+		t.Fatalf("repeated disconnect changed persisted data: status equal=%v room equal=%v", storedStatus == firstDisconnectStatus, storedRoom == firstDisconnectRoom)
+	}
 
 	if err := service.EndRoomGame(client, roomID); err != nil {
 		t.Fatalf("EndRoomGame() error = %v", err)
+	}
+	firstEndRoom, err := client.Get(context.Background(), roomKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstOnlineStatus, err := client.Get(context.Background(), otherStatusKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.EndRoomGame(client, roomID); err != nil {
+		t.Fatalf("repeated EndRoomGame() error = %v", err)
+	}
+	secondEndRoom, err := client.Get(context.Background(), roomKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondOnlineStatus, err := client.Get(context.Background(), otherStatusKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstEndRoom != secondEndRoom || firstOnlineStatus != secondOnlineStatus {
+		t.Fatalf("repeated game cleanup changed state: room equal=%v online status equal=%v", firstEndRoom == secondEndRoom, firstOnlineStatus == secondOnlineStatus)
 	}
 	if _, err := client.Get(context.Background(), statusKey).Result(); err != redis.Nil {
 		t.Fatalf("disconnected user's status after game end error = %v, want redis.Nil", err)
