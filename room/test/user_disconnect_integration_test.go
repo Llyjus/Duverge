@@ -165,15 +165,63 @@ func TestHandleDisconnectPreservesInGameMemberAndDisconnectedState(t *testing.T)
 	if err := service.EndRoomGame(client, roomID); err != nil {
 		t.Fatalf("EndRoomGame() error = %v", err)
 	}
-	storedStatus, err = client.Get(context.Background(), statusKey).Result()
+	if _, err := client.Get(context.Background(), statusKey).Result(); err != redis.Nil {
+		t.Fatalf("disconnected user's status after game end error = %v, want redis.Nil", err)
+	}
+	storedStatus, err = client.Get(context.Background(), otherStatusKey).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal([]byte(storedStatus), &updatedStatus); err != nil {
 		t.Fatal(err)
 	}
-	if updatedStatus.Status != entity.UserStatusInRoom || updatedStatus.ConnectionStatus != entity.UserConnectionStatusDisconnected {
-		t.Fatalf("status after game end = %+v, want in_room and connection_status=disconnected", updatedStatus)
+	if updatedStatus.Status != entity.UserStatusInRoom || updatedStatus.ConnectionStatus == entity.UserConnectionStatusDisconnected {
+		t.Fatalf("connected user's status after game end = %+v, want in_room and connected", updatedStatus)
+	}
+	storedRoom, err = client.Get(context.Background(), roomKey).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(storedRoom), &updatedRoom); err != nil {
+		t.Fatal(err)
+	}
+	if updatedRoom.Status != entity.RoomStatusWaiting || len(updatedRoom.UserIDs) != 1 || updatedRoom.UserIDs[0] != otherID || len(updatedRoom.DisconnectedUserIDs) != 0 {
+		t.Fatalf("room after game end = %+v, want only connected member and no disconnect markers", updatedRoom)
+	}
+}
+
+func TestEndRoomGameDeletesRoomWhenAllMembersAreDisconnected(t *testing.T) {
+	client := resilienceRedis(t)
+	suffix := strconv.FormatInt(time.Now().UnixNano(), 10)
+	roomID := "disconnect-all-game-" + suffix
+	userID := "disconnect-all-player-" + suffix
+	roomKey := "room:" + roomID
+	statusKey := "user_status:" + userID
+	t.Cleanup(func() { _ = client.Del(context.Background(), roomKey, statusKey).Err() })
+	roomJSON, _ := json.Marshal(entity.Room{
+		RoomID: roomID, MaximumSize: 4, UserIDs: []string{userID},
+		DisconnectedUserIDs: []string{userID}, HosterID: userID,
+		Prepared: []string{userID}, Status: entity.RoomStatusInGame,
+	})
+	statusJSON, _ := json.Marshal(entity.UserStatus{
+		UserID: userID, Status: entity.UserStatusInGame, RoomID: roomID,
+		ConnectionStatus: entity.UserConnectionStatusDisconnected,
+	})
+	if err := client.Set(context.Background(), roomKey, roomJSON, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Set(context.Background(), statusKey, statusJSON, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.EndRoomGame(client, roomID); err != nil {
+		t.Fatalf("EndRoomGame() error = %v", err)
+	}
+	if _, err := client.Get(context.Background(), roomKey).Result(); err != redis.Nil {
+		t.Fatalf("room lookup error = %v, want redis.Nil", err)
+	}
+	if _, err := client.Get(context.Background(), statusKey).Result(); err != redis.Nil {
+		t.Fatalf("user status lookup error = %v, want redis.Nil", err)
 	}
 }
 
