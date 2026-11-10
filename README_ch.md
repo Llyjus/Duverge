@@ -13,6 +13,7 @@ Duverge 是一个面向多人游戏场景的后端实验项目。项目采用 Ga
 - [监控系统](#监控系统)
 - [HTTP API](#http-api)
 - [TCP 协议](#tcp-协议)
+- [TCP 断线处理](#tcp-断线处理)
 - [Gateway 超时设置](#gateway-超时设置)
 - [密码哈希并发限制](#密码哈希并发限制)
 - [内部 gRPC API](#内部-grpc-api)
@@ -671,6 +672,21 @@ Gateway 会读取 `room:<roomId>` 的 `userIds`，向当前在线成员发送：
 
 认证失败和版本错误返回错误后会关闭 TCP 连接；普通业务错误通常保持连接。
 
+## TCP 断线处理
+
+Gateway 的 TCP Read Loop 检测到 EOF、连接重置、读取 deadline 超时或其他不可恢复的读取错误时，会统一进入 Disconnect handler。同一连接只处理一次：从本地 ConnectionManager 移除并关闭 socket。未认证连接只做 Gateway 本地清理；已认证连接会通知 Room，`UserDisconnected` gRPC 请求包含 `user_id`、`session_id` 和 `message_id`。
+
+Room 会将请求中的 Session 与 Redis 当前的 `session_account:<user_id>` 映射比较。旧 Session 的迟到断线通知会被忽略，不会把新连接标记为断线。Room 修改状态时还会在 Redis `WATCH` 事务中监视 Session 映射、房间和用户状态，避免检查与清理之间发生 Session 替换。
+
+断线后的处理取决于用户所在状态：
+
+- 用户不在房间或已被移出时，作为成功的空操作处理。
+- 用户在等待房间时，Room 在 Redis 事务中移除成员并删除其 `user_status:<user_id>`；房间变空后按现有规则删除房间。
+- 用户正在游戏时，保留房间成员关系和游戏状态，将用户标记为 `disconnected`，并让状态持续到游戏结束。
+- 游戏结束时，移除断线成员及其用户状态；在线成员回到等待状态。重复执行结束清理不会改变已完成的状态。
+
+断线 RPC 使用 Room 现有的 Message ID 幂等服务。Redis 读写失败会作为错误返回，不会报告清理成功。Room 集成测试覆盖房间外通知、等待房间清理、游戏中断线、游戏结束清理、重复通知、旧 Session 和 Redis 错误。
+
 ## Gateway 超时设置
 
 Gateway 的 HTTP 路由通过 `http.TimeoutHandler` 使用统一请求超时。该 deadline 会随请求 context 传入 UserData/Room gRPC 调用和 Redis 操作；请求超过预算时返回 HTTP `503`、`Request timed out`。Redis/session 存储自身不可用时，`POST /login_session` 返回 HTTP `503`、`Session service unavailable`；无效或过期 session 仍返回 HTTP `401`。
@@ -1031,7 +1047,14 @@ cd gateway && go test ./...
 cd ../room && go test ./...
 ```
 
-Gateway 的 deadline、下游不可用、调用重试次数和 Redis 断连语义测试在 `gateway/test/resiliencetest`，会由 `go test ./...` 一并运行。Room 的 Redis 集成测试需要显式设置 `RESILIENCE_REDIS_ADDR` 并连接测试 Redis；运行前请阅读对应测试文件，确保测试 key 使用隔离环境。
+Gateway 的 deadline、下游不可用、调用重试次数和 Redis 断连语义测试在 `gateway/test/resiliencetest`，会由 `go test ./...` 一并运行。Room 的断线处理和其他 Redis 集成测试位于 `room/test`，需要显式设置 `RESILIENCE_REDIS_ADDR` 并连接隔离的 Redis。例如：
+
+```bash
+cd room
+RESILIENCE_REDIS_ADDR=127.0.0.1:6379 go test ./test -run 'TestHandleDisconnect|TestEndRoomGame' -v
+```
+
+测试使用唯一 key 并在结束时清理。不要将测试指向生产或共享开发 Redis。
 
 仓库里的 K6 生命周期脚本位于 `gateway/test/k6/benchmark.js`，需要包含 `k6/x/tcp` 扩展的 k6 构建。脚本会创建并持久化测试账号，每轮使用新的 `RUN_ID`，不要直接在生产数据上运行。默认场景按 10、25、50 VU 分阶段启动；压测记录和结果解释见 [`gateway/test/k6/baseline.md`](gateway/test/k6/baseline.md)。
 

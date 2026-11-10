@@ -13,6 +13,7 @@ Duverge is an experimental multiplayer game backend. It contains a Go Gateway, a
 - [Monitoring](#monitoring)
 - [HTTP API](#http-api)
 - [TCP API](#tcp-api)
+- [TCP disconnect handling](#tcp-disconnect-handling)
 - [Timeouts](#timeouts)
 - [gRPC services](#grpc-services)
 - [Storage](#storage)
@@ -305,6 +306,21 @@ Room chat uses `type: "room"` and a `room_id`; private chat uses `type: "private
 
 TCP error codes include `INVALID_MESSAGE`, `UNAUTHENTICATED`, `AUTHENTICATION_FAILED`, `FORBIDDEN`, `NOT_FOUND`, `VERSION_MISMATCH`, `INTERNAL_ERROR` and `SERVER_CLOSED_ERROR`.
 
+## TCP disconnect handling
+
+When Gateway detects EOF, connection reset, read deadline expiration or another unrecoverable read error, its disconnect handler runs once for that connection. It removes the connection from the local manager and closes the socket. Unauthenticated connections are only cleaned up locally. For an authenticated connection, Gateway sends Room a `UserDisconnected` gRPC request containing `user_id`, `session_id` and `message_id`.
+
+Room compares the supplied session with the current `session_account:<user_id>` mapping in Redis. A notification for an old session is ignored, so it cannot mark a newer connection disconnected. Room state changes watch that session mapping together with the room and user-status keys to avoid a session replacement racing with cleanup.
+
+Disconnect behavior follows the user's current room/game state:
+
+- A user outside a room, or already removed, is treated as a successful no-op.
+- In a waiting room, Room removes the member and their `user_status:<user_id>` state in a Redis transaction. An empty room is deleted.
+- During a game, Room retains membership and game state, records the user as disconnected, and keeps the status persistent until game end.
+- At game end, disconnected members and their user-status keys are removed; connected members return to the waiting state. Repeating end-game cleanup leaves the resulting state unchanged.
+
+Room uses its existing Message ID idempotency service for the disconnect RPC. Redis read/write failures are returned as errors; they are not reported as successful cleanup. The Room integration tests cover outside-room notifications, waiting-room cleanup, in-game disconnects, game-end cleanup, repeated notifications, stale sessions and Redis errors.
+
 ## Timeouts
 
 HTTP routes share `GATEWAY_REQUEST_TIMEOUT` (default `10s`) through `http.TimeoutHandler`. Its request context is passed to downstream gRPC and Redis calls. Expired HTTP requests return `503 Request timed out`.
@@ -472,7 +488,14 @@ Go services are separate modules:
 (cd room && go test ./...)
 ```
 
-Gateway resilience tests live under `gateway/test/resiliencetest`. Some Room Redis integration tests require a local Redis and an explicit `RESILIENCE_REDIS_ADDR`; see the test source before running them. The `gateway/test/k6/benchmark.js` script requires a k6 build that includes the `k6/x/tcp` extension. It creates persistent test accounts; use a fresh `RUN_ID` for each run and clean only the generated test data afterward.
+Gateway resilience tests live under `gateway/test/resiliencetest`. Room disconnect and other Redis integration tests live under `room/test` and require an isolated Redis instance plus `RESILIENCE_REDIS_ADDR`. For example:
+
+```bash
+cd room
+RESILIENCE_REDIS_ADDR=127.0.0.1:6379 go test ./test -run 'TestHandleDisconnect|TestEndRoomGame' -v
+```
+
+The tests use unique keys and clean them up. Do not point them at production or a shared development Redis. The `gateway/test/k6/benchmark.js` script requires a k6 build that includes the `k6/x/tcp` extension. It creates persistent test accounts; use a fresh `RUN_ID` for each run and clean only the generated test data afterward.
 
 The heartbeat black-box script is:
 
