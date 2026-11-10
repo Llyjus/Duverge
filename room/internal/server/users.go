@@ -102,3 +102,16 @@ func (s *RoomServer) SetPreparation(
 		Status: req.GetTargetStatus(),
 	}, nil
 }
+
+func (s *RoomServer) UserDisconnected(
+	ctx context.Context,
+	req *pb.UserDisconnectedRequest,
+) (*pb.UserDisconnectedResponse, error) {
+	err := s.idempotencyService.Run(ctx, req.GetMessageId(), func() error {
+		return service.HandleDisconnect(ctx, s.client, req.GetUserId())
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.UserDisconnectedResponse{Result: true}, nil
+}

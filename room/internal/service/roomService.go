@@ -66,6 +66,7 @@ func CreateRoom(
 			userStatus := &entity.UserStatus{
 				UserID: HosterID,
 				Status: entity.UserStatusInRoom,
+				RoomID: roomCode,
 			}
 			userStatusJSON, err := json.Marshal(userStatus)
 			if err != nil {

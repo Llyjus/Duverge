@@ -75,54 +75,90 @@ func EndGame(
 	roomID string,
 ) error {
 	ctx := context.Background()
-
-	room, err := GetRoom(client, roomID)
+	roomSnapshot, err := GetRoom(client, roomID)
 	if err != nil {
 		return err
 	}
 
-	if room == nil {
+	if roomSnapshot == nil {
 		return errors.New("room not found")
 	}
 
-	room.Status = entity.RoomStatusWaiting
-	room.Prepared = []string{}
-
-	roomJSON, err := json.Marshal(room)
-	if err != nil {
-		return err
+	roomKey := "room:" + roomID
+	watchKeys := []string{roomKey}
+	for _, userID := range roomSnapshot.UserIDs {
+		watchKeys = append(watchKeys, "user_status:"+userID)
 	}
 
-	_, err = client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+	return client.Watch(ctx, func(tx *redis.Tx) error {
+		roomJSON, err := tx.Get(ctx, roomKey).Result()
+		if err != nil {
+			return err
+		}
+		var room entity.Room
+		if err := json.Unmarshal([]byte(roomJSON), &room); err != nil {
+			return err
+		}
+		if !sameIDs(roomSnapshot.UserIDs, room.UserIDs) {
+			return redis.TxFailedErr
+		}
 
-		pipe.Set(
-			ctx,
-			"room:"+roomID,
-			roomJSON,
-			0,
-		)
+		room.Status = entity.RoomStatusWaiting
+		room.Prepared = []string{}
+		updatedRoomJSON, err := json.Marshal(room)
+		if err != nil {
+			return err
+		}
 
+		userStatuses := make(map[string][]byte, len(room.UserIDs))
 		for _, userID := range room.UserIDs {
-			userStatus := entity.UserStatus{
-				UserID: userID,
-				Status: entity.UserStatusInRoom,
+			status := entity.UserStatus{UserID: userID, Status: entity.UserStatusInRoom, RoomID: roomID}
+			statusJSON, err := tx.Get(ctx, "user_status:"+userID).Result()
+			if err == nil {
+				if err := json.Unmarshal([]byte(statusJSON), &status); err != nil {
+					return err
+				}
+			} else if err != redis.Nil {
+				return err
 			}
-
-			userStatusJSON, err := json.Marshal(userStatus)
+			status.Status = entity.UserStatusInRoom
+			status.RoomID = roomID
+			if containsID(room.DisconnectedUserIDs, userID) {
+				status.ConnectionStatus = entity.UserConnectionStatusDisconnected
+			}
+			encodedStatus, err := json.Marshal(status)
 			if err != nil {
 				return err
 			}
-
-			pipe.Set(
-				ctx,
-				"user_status:"+userID,
-				userStatusJSON,
-				0,
-			)
+			userStatuses[userID] = encodedStatus
 		}
 
-		return nil
-	})
+		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+			pipe.Set(ctx, roomKey, updatedRoomJSON, 0)
+			for userID, statusJSON := range userStatuses {
+				pipe.Set(ctx, "user_status:"+userID, statusJSON, 0)
+			}
+			return nil
+		})
+		return err
+	}, watchKeys...)
+}
 
-	return err
+func sameIDs(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func connectionStatusFor(disconnectedUserIDs []string, userID string) string {
+	if containsID(disconnectedUserIDs, userID) {
+		return entity.UserConnectionStatusDisconnected
+	}
+	return ""
 }

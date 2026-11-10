@@ -78,8 +78,10 @@ func StartGame(
 				userStatusKey := "user_status:" + userID
 
 				userStatus := entity.UserStatus{
-					UserID: userID,
-					Status: entity.UserStatusInGame,
+					UserID:           userID,
+					Status:           entity.UserStatusInGame,
+					RoomID:           roomID,
+					ConnectionStatus: connectionStatusFor(room.DisconnectedUserIDs, userID),
 				}
 
 				userStatusJSON, err := json.Marshal(userStatus)

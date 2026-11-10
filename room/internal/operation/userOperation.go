@@ -34,6 +34,25 @@ func CheckUserStatus(
 	return userStatus.Status, nil
 }
 
+func GetUserStatus(ctx context.Context, client *redis.Client, userId string) (*entity.UserStatus, error) {
+	userStatusJSON, err := client.Get(ctx, "user_status:"+userId).Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var userStatus entity.UserStatus
+	if err := json.Unmarshal([]byte(userStatusJSON), &userStatus); err != nil {
+		return nil, err
+	}
+	return &userStatus, nil
+}
+
+func DeleteUserStatus(ctx context.Context, client *redis.Client, userId string) error {
+	return client.Del(ctx, "user_status:"+userId).Err()
+}
+
 func UpdateUserStatus(
 	client *redis.Client,
 	userId string,

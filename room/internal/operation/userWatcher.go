@@ -62,6 +62,8 @@ func ExitRoom(
 
 		// Change status
 		userStatus.Status = entity.UserStatusInLobby
+		userStatus.RoomID = ""
+		userStatus.ConnectionStatus = ""
 
 		newStatusJSON, err := json.Marshal(userStatus)
 		if err != nil {
@@ -151,6 +153,8 @@ func JoinRoom(
 
 		// Change user status
 		userStatus.Status = entity.UserStatusInRoom
+		userStatus.RoomID = roomID
+		userStatus.ConnectionStatus = ""
 
 		// Marshal
 		newRoomJSON, err := json.Marshal(room)
